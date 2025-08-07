@@ -1,0 +1,37 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    container_name: psc_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: pscdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Il1k3f1sh1ngperch!
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - psc_net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: psc_backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - psc_net
+
+volumes:
+  postgres_data:
+
+networks:
+  psc_net:
