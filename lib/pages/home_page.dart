@@ -592,17 +592,30 @@ class _HomePageState extends State<HomePage> {
 
       debugPrint('📥 Download Status: ${response.statusCode}');
       debugPrint('📥 Content-Type: ${response.headers['content-type']}');
+      debugPrint('📥 All headers: ${response.headers}');
 
       if (response.statusCode == 200) {
         // Get filename from Content-Disposition header or use default
         String filename = 'attachment';
         final contentDisposition = response.headers['content-disposition'];
-        if (contentDisposition != null) {
-          debugPrint('📥 Content-Disposition: $contentDisposition');
+        debugPrint('📥 Content-Disposition (exact): $contentDisposition');
+
+        // Try alternative header keys (case variations)
+        final altContentDisposition = response.headers['Content-Disposition'] ??
+            response.headers['CONTENT-DISPOSITION'] ??
+            response.headers['content-Disposition'];
+        debugPrint(
+            '📥 Alternative Content-Disposition: $altContentDisposition');
+
+        final actualContentDisposition =
+            contentDisposition ?? altContentDisposition;
+
+        if (actualContentDisposition != null) {
+          debugPrint('📥 Using Content-Disposition: $actualContentDisposition');
 
           // Try RFC 5987 encoding first (filename*=UTF-8''encoded_name)
           final rfc5987Match = RegExp(r"filename\*=UTF-8''([^;]+)")
-              .firstMatch(contentDisposition);
+              .firstMatch(actualContentDisposition);
           if (rfc5987Match != null) {
             final encodedFilename = rfc5987Match.group(1) ?? '';
             try {
@@ -611,23 +624,27 @@ class _HomePageState extends State<HomePage> {
             } catch (e) {
               debugPrint('📥 Failed to decode RFC 5987 filename: $e');
               // Fallback to simple quoted filename
-              final simpleMatch =
-                  RegExp(r'filename="([^"]+)"').firstMatch(contentDisposition);
+              final simpleMatch = RegExp(r'filename="([^"]+)"')
+                  .firstMatch(actualContentDisposition);
               if (simpleMatch != null) {
                 filename = simpleMatch.group(1) ?? filename;
               }
             }
           } else {
             // Fallback to simple quoted filename
-            final simpleMatch =
-                RegExp(r'filename="([^"]+)"').firstMatch(contentDisposition);
+            final simpleMatch = RegExp(r'filename="([^"]+)"')
+                .firstMatch(actualContentDisposition);
             if (simpleMatch != null) {
               filename = simpleMatch.group(1) ?? filename;
             }
           }
-        }
 
-        debugPrint('📥 Final filename: $filename');
+          // Apply Unicode decoding to handle special characters properly
+          filename = _decodeFilename(filename);
+        } else {
+          debugPrint('📥 No Content-Disposition header found!');
+        }
+        debugPrint('📥 Final decoded filename: $filename');
 
         if (kIsWeb) {
           // Web download - direct file streaming with proper MIME type
