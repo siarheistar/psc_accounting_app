@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../models/accounting_models.dart';
 import '../context/simple_company_context.dart';
+import '../dialogs/edit_bank_statement_dialog.dart';
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -423,7 +424,8 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
       debugPrint('📄 Failed to decode filename: $filename, error: $e');
       return filename; // Return original if decoding fails
     }
-  }  // Helper function to format file size
+  } // Helper function to format file size
+
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -650,7 +652,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
                 icon: Icons.edit,
                 label: 'Edit',
                 color: Colors.blue,
-                onPressed: () => {}, // TODO: Add edit functionality
+                onPressed: () => _editBankStatement(statement),
               ),
               _buildActionButton(
                 icon: Icons.attach_file,
@@ -668,13 +670,72 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
                 icon: Icons.delete,
                 label: 'Delete',
                 color: Colors.red,
-                onPressed: () => {}, // TODO: Add delete functionality
+                onPressed: () => _deleteBankStatement(statement),
               ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  void _editBankStatement(BankStatement statement) {
+    debugPrint('🏦 [BankStatementsPage] Edit bank statement clicked for: ${statement.description}');
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return EditBankStatementDialog(bankStatement: statement);
+      },
+    ).then((_) {
+      debugPrint('🏦 [BankStatementsPage] Edit dialog closed, refreshing statements...');
+      _loadBankStatements();
+    });
+  }
+
+  void _deleteBankStatement(BankStatement statement) async {
+    // Ensure company context is set before attempting delete
+    _initializeCompanyContext();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Bank Statement'),
+          content: Text(
+              'Are you sure you want to delete bank statement: ${statement.description}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        debugPrint('🗑️ === DELETE BANK STATEMENT ===');
+        debugPrint('🗑️ Statement ID: ${statement.id}');
+        debugPrint('🗑️ Description: ${statement.description}');
+        debugPrint('🗑️ Company Context: ${_dbService.currentCompanyId}');
+        debugPrint('🗑️ Demo Mode: ${_dbService.isDemoMode}');
+
+        await _dbService.deleteBankStatement(statement.id);
+        _loadBankStatements();
+        
+        debugPrint('🗑️ Bank statement deleted successfully');
+        _showSnackBar('Bank statement deleted successfully');
+      } catch (e) {
+        debugPrint('🗑️ Error deleting bank statement: $e');
+        _showSnackBar('Failed to delete bank statement: $e', isError: true);
+      }
+    }
   }
 
   Widget _buildActionButton({

@@ -3,6 +3,7 @@ import '../services/database_service.dart';
 import '../models/accounting_models.dart';
 import '../context/simple_company_context.dart';
 import '../dialogs/add_payroll_dialog.dart';
+import '../dialogs/edit_payroll_dialog.dart';
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -434,7 +435,8 @@ class _PayrollPageState extends State<PayrollPage> {
       debugPrint('📄 Failed to decode filename: $filename, error: $e');
       return filename; // Return original if decoding fails
     }
-  }  // Helper function to format file size
+  } // Helper function to format file size
+
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -452,7 +454,23 @@ class _PayrollPageState extends State<PayrollPage> {
     }
   }
 
+  void _editPayrollEntry(PayrollEntry entry) {
+    debugPrint('💰 [PayrollPage] Edit payroll entry clicked for: ${entry.employeeName}');
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return EditPayrollDialog(payrollEntry: entry);
+      },
+    ).then((_) {
+      debugPrint('💰 [PayrollPage] Edit dialog closed, refreshing entries...');
+      _loadPayrollEntries();
+    });
+  }
+
   void _deletePayrollEntry(PayrollEntry entry) async {
+    // Ensure company context is set before attempting delete
+    _initializeCompanyContext();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -467,6 +485,7 @@ class _PayrollPageState extends State<PayrollPage> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Delete'),
             ),
           ],
@@ -476,18 +495,20 @@ class _PayrollPageState extends State<PayrollPage> {
 
     if (confirmed == true) {
       try {
-        final company = SimpleCompanyContext.selectedCompany;
-        if (company == null) return;
+        debugPrint('🗑️ === DELETE PAYROLL ENTRY ===');
+        debugPrint('🗑️ Entry ID: ${entry.id}');
+        debugPrint('🗑️ Employee Name: ${entry.employeeName}');
+        debugPrint('🗑️ Company Context: ${_dbService.currentCompanyId}');
+        debugPrint('🗑️ Demo Mode: ${_dbService.isDemoMode}');
 
         await _dbService.deletePayrollEntry(entry.id);
         _loadPayrollEntries();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payroll entry deleted successfully')),
-        );
+        
+        debugPrint('🗑️ Payroll entry deleted successfully');
+        _showSnackBar('Payroll entry deleted successfully');
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete payroll entry: $e')),
-        );
+        debugPrint('🗑️ Error deleting payroll entry: $e');
+        _showSnackBar('Failed to delete payroll entry: $e', isError: true);
       }
     }
   }
@@ -623,7 +644,7 @@ class _PayrollPageState extends State<PayrollPage> {
                 icon: Icons.edit,
                 label: 'Edit',
                 color: Colors.blue,
-                onPressed: () => {}, // TODO: Add edit functionality
+                onPressed: () => _editPayrollEntry(entry),
               ),
               _buildActionButton(
                 icon: Icons.attach_file,
