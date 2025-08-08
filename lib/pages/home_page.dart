@@ -9,6 +9,10 @@ import 'package:file_picker/file_picker.dart';
 
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../pages/invoices_page.dart';
+import '../pages/expenses_page.dart';
+import '../pages/payroll_page.dart';
+import '../pages/bank_statements_page.dart';
 import '../models/accounting_models.dart';
 import '../dialogs/add_invoice_dialog.dart';
 import '../dialogs/add_expense_dialog.dart';
@@ -160,32 +164,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showAddDialog() {
-    if (_dbService.isDemoMode) {
-      _showSnackBar(
-          'Cannot add transactions in demo mode. Create a real company first.',
-          isError: true);
-      return;
-    }
-
-    switch (_selectedTabIndex) {
-      case 0:
-        _showAddInvoiceDialog();
-        break;
-      case 1:
-        _showAddExpenseDialog();
-        break;
-      case 2:
-        _showAddPayrollDialog();
-        break;
-      case 3:
-        _showAddBankStatementDialog();
-        break;
-      default:
-        _addSampleTransaction();
-    }
-  }
-
   void _showAddInvoiceDialog() async {
     final result = await showDialog<Invoice>(
       context: context,
@@ -215,13 +193,10 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (expense != null) {
-      try {
-        await _dbService.insertExpense(expense);
-        _showSnackBar('Expense created successfully!');
-        await _loadDashboardData();
-      } catch (e) {
-        _showSnackBar('Failed to create expense: $e', isError: true);
-      }
+      // Dialog has already handled the insertion, just refresh the data
+      debugPrint('🏠 ✅ Expense created successfully, refreshing data');
+      _showSnackBar('Expense created successfully!');
+      await _loadDashboardData();
     }
   }
 
@@ -739,45 +714,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _addSampleTransaction() async {
-    if (_dbService.isDemoMode) {
-      _showSnackBar(
-          'Cannot add transactions in demo mode. Create a real company first.',
-          isError: true);
-      return;
-    }
-
-    try {
-      debugPrint('💰 === ADDING SAMPLE TRANSACTION ===');
-
-      final invoice = Invoice(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        invoiceNumber:
-            'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        clientName:
-            'Sample Client ${DateTime.now().hour}:${DateTime.now().minute}',
-        amount:
-            (500 + (DateTime.now().millisecondsSinceEpoch % 2000)).toDouble(),
-        date: DateTime.now(),
-        dueDate: DateTime.now().add(const Duration(days: 30)),
-        status: 'Pending',
-        description: 'Sample invoice created from dashboard',
-        createdAt: DateTime.now(),
-      );
-
-      await _dbService.insertInvoice(invoice);
-
-      _showSnackBar('Sample invoice created successfully!');
-
-      // Reload dashboard data
-      await _loadDashboardData();
-    } catch (e) {
-      debugPrint('💰 === TRANSACTION ERROR ===');
-      debugPrint('💰 Error: $e');
-      _showSnackBar('Failed to create transaction: $e', isError: true);
-    }
-  }
-
   void _showSnackBar(String message, {bool isError = false}) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -819,6 +755,59 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
+          // Add Invoice button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddInvoiceDialog(),
+            icon: Icon(
+              Icons.receipt_long,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Invoice',
+          ),
+          // Add Expense button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddExpenseDialog(),
+            icon: Icon(
+              Icons.money_off,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Expense',
+          ),
+          // Add Payroll button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddPayrollDialog(),
+            icon: Icon(
+              Icons.person,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Payroll',
+          ),
+          // Add Bank Statement button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddBankStatementDialog(),
+            icon: Icon(
+              Icons.account_balance,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Bank Statement',
+          ),
+          const SizedBox(width: 8),
           // Company info button
           IconButton(
             onPressed: () => _showCompanyInfo(),
@@ -826,19 +815,7 @@ class _HomePageState extends State<HomePage> {
               Icons.info_outline,
               color: isDemoMode ? Colors.orange : Colors.blue,
             ),
-          ),
-          // Period selector
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'This Month',
-              style: TextStyle(fontSize: 12),
-            ),
+            tooltip: 'Company Info',
           ),
           // User profile
           Padding(
@@ -881,12 +858,7 @@ class _HomePageState extends State<HomePage> {
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
               ? _buildErrorView()
-              : Stack(
-                  children: [
-                    _buildDashboard(),
-                    _buildCustomFloatingAction(),
-                  ],
-                ),
+              : _buildDashboard(),
     );
   }
 
@@ -940,13 +912,13 @@ class _HomePageState extends State<HomePage> {
               color: Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // Metrics cards
+          // Metrics cards with adjusted height
           _buildMetricsCards(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
-          // Data tabs
+          // Horizontal data tabs
           _buildDataTabs(),
           const SizedBox(height: 16),
 
@@ -1072,7 +1044,7 @@ class _HomePageState extends State<HomePage> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        childAspectRatio: 1.2,
+        childAspectRatio: 2.6, // Reduced height - twice less than before
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -1226,8 +1198,19 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             TextButton.icon(
-              onPressed: () =>
-                  _showSnackBar('View all invoices feature coming soon!'),
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const InvoicesPage(),
+                  ),
+                );
+                // If invoices were modified, refresh dashboard
+                if (result == true) {
+                  print(
+                      '🔄 [HomePage] Invoices were modified, refreshing dashboard...');
+                  await _loadDashboardData();
+                }
+              },
               icon: const Icon(Icons.visibility, size: 16),
               label: const Text('View All'),
             ),
@@ -1239,6 +1222,166 @@ class _HomePageState extends State<HomePage> {
             .map((invoice) => _buildInvoiceCard(invoice))
             .toList(),
       ],
+    );
+  }
+
+  Widget _buildExpensesList() {
+    if (_expenses.isEmpty) {
+      return _buildEmptyState(
+          'No expenses found', 'Track your first expense to get started');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Expenses (${_expenses.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ExpensesPage(),
+                  ),
+                );
+                // If expenses were modified, refresh dashboard
+                if (result == true) {
+                  print(
+                      '🔄 [HomePage] Expenses were modified, refreshing dashboard...');
+                  await _loadDashboardData();
+                }
+              },
+              icon: const Icon(Icons.visibility, size: 16),
+              label: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._expenses
+            .take(5)
+            .map((expense) => _buildExpenseCard(expense))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildPayrollList() {
+    if (_payrollEntries.isEmpty) {
+      return _buildEmptyState(
+          'No payroll entries found', 'Add your first payroll entry');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Payroll (${_payrollEntries.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PayrollPage(),
+                ),
+              ),
+              icon: const Icon(Icons.visibility, size: 16),
+              label: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._payrollEntries
+            .take(5)
+            .map((entry) => _buildPayrollCard(entry))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildBankStatementsList() {
+    if (_bankStatements.isEmpty) {
+      return _buildEmptyState(
+          'No bank statements found', 'Import your first bank statement');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Bank Statements (${_bankStatements.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const BankStatementsPage(),
+                ),
+              ),
+              icon: const Icon(Icons.visibility, size: 16),
+              label: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._bankStatements
+            .take(5)
+            .map((statement) => _buildBankStatementCard(statement))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1357,32 +1500,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildExpensesList() {
-    if (_expenses.isEmpty) {
-      return _buildEmptyState(
-          'No expenses found', 'Track your first expense to get started');
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recent Expenses (${_expenses.length})',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ..._expenses
-            .take(5)
-            .map((expense) => _buildExpenseCard(expense))
-            .toList(),
-      ],
-    );
-  }
-
   Widget _buildExpenseCard(Expense expense) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1477,18 +1594,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildPayrollList() {
-    if (_payrollEntries.isEmpty) {
-      return _buildEmptyState(
-          'No payroll entries found', 'Add your first payroll entry');
-    }
-
-    return Column(
-      children:
-          _payrollEntries.map((entry) => _buildPayrollCard(entry)).toList(),
-    );
-  }
-
   Widget _buildPayrollCard(PayrollEntry entry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1579,19 +1684,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBankStatementsList() {
-    if (_bankStatements.isEmpty) {
-      return _buildEmptyState(
-          'No bank statements found', 'Import your first bank statement');
-    }
-
-    return Column(
-      children: _bankStatements
-          .map((statement) => _buildBankStatementCard(statement))
-          .toList(),
     );
   }
 
@@ -1841,70 +1933,6 @@ class _HomePageState extends State<HomePage> {
             isError: true);
       }
     }
-  }
-
-  Widget _buildEmptyState(String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomFloatingAction() {
-    return Positioned(
-      right: 20,
-      bottom: 100, // Position higher to avoid overlap with list items
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          heroTag: "home_custom_fab",
-          onPressed: _dbService.isDemoMode
-              ? () => _showSnackBar(
-                  'Demo mode - Create a real company to add transactions',
-                  isError: true)
-              : _showAddDialog,
-          backgroundColor: _dbService.isDemoMode ? Colors.orange : Colors.blue,
-          child: Icon(
-            _dbService.isDemoMode ? Icons.preview : Icons.add,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
   }
 
   void _showCompanyInfo() {

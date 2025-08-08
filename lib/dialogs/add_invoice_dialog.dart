@@ -20,6 +20,7 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
 
   DateTime _selectedDate = DateTime.now();
   String _selectedStatus = 'pending'; // Add status field
+  bool _isSaving = false; // Add saving state to prevent double submission
 
   @override
   void dispose() {
@@ -99,9 +100,17 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   }
 
   Future<void> _saveInvoice() async {
+    // Prevent double submission
+    if (_isSaving) {
+      print(
+          '🧾 [AddInvoiceDialog] Save already in progress, ignoring duplicate request');
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     print('🧾 [AddInvoiceDialog] === STARTING INVOICE SAVE ===');
+    setState(() => _isSaving = true);
 
     // Pre-save company context verification
     final preCheckCompany = SimpleCompanyContext.selectedCompany;
@@ -208,6 +217,10 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
       } else {
         print(
             '🧾 [AddInvoiceDialog] Widget not mounted, skipping error dialog');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -358,8 +371,17 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: _saveInvoice,
-          child: const Text('Save'),
+          onPressed: _isSaving ? null : _saveInvoice, // Disable when saving
+          child: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('Save'),
         ),
       ],
     );

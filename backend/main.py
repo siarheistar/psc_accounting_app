@@ -317,7 +317,7 @@ async def get_invoices(company_id: str = Query(..., description="Company ID")):
             invoice = {
                 "id": str(row['id']),
                 "company_id": str(row['company_id']),
-                "invoice_number": f"INV-{row['id']:04d}",  # Generate invoice number from ID
+                "invoice_number": f"INV-{row['id']:04d}",  # Generate invoice number from ID for now
                 "client_name": row['client_name'],  # Use actual column name
                 "amount": float(row['amount']) if row['amount'] else 0.0,
                 "date": row['date'].isoformat() if row['date'] else None,
@@ -758,7 +758,8 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
             invoice_data.get('status', 'pending')
         ), fetch=True)
         
-        invoice_id = result[0]['id'] if result else None
+        # Handle the result properly - it's a tuple when using RETURNING
+        invoice_id = result[0] if result and len(result) > 0 else None
         print(f"✅ [Backend] Invoice created with ID: {invoice_id}")
         return {"id": invoice_id, "message": "Invoice created successfully"}
         
@@ -790,7 +791,8 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
             expense_data.get('date')
         ), fetch=True)
         
-        expense_id = result[0]['id'] if result else None
+        # Handle the result properly - it's a tuple when using RETURNING
+        expense_id = result[0] if result and len(result) > 0 else None
         print(f"✅ [Backend] Expense created with ID: {expense_id}")
         return {"id": expense_id, "message": "Expense created successfully"}
         
@@ -824,7 +826,8 @@ async def create_payroll(payroll_data: dict, company_id: str = Query(..., descri
             payroll_data.get('pay_date')
         ), fetch=True)
         
-        payroll_id = result[0]['id'] if result else None
+        # Handle the result properly - it's a tuple when using RETURNING
+        payroll_id = result[0] if result and len(result) > 0 else None
         print(f"✅ [Backend] Payroll entry created with ID: {payroll_id}")
         return {"id": payroll_id, "message": "Payroll entry created successfully"}
         
@@ -867,16 +870,8 @@ async def create_bank_statement(statement_data: dict, company_id: str = Query(..
             balance
         ), fetch=True)
         
-        # Handle the result properly (it's a dict when returning ID)
-        if result:
-            if isinstance(result, list) and len(result) > 0:
-                statement_id = result[0]['id']
-            elif isinstance(result, dict):
-                statement_id = result['id']
-            else:
-                statement_id = result
-        else:
-            statement_id = None
+        # Handle the result properly - it's a tuple when using RETURNING
+        statement_id = result[0] if result and len(result) > 0 else None
             
         print(f"✅ [Backend] Bank statement created with ID: {statement_id}")
         return {"id": statement_id, "message": "Bank statement created successfully"}

@@ -30,6 +30,7 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
   List<String> _periodOptions = [];
 
   bool _isLoading = true;
+  bool _isSaving = false; // Add saving state to prevent double submission
 
   @override
   void initState() {
@@ -206,6 +207,13 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
   }
 
   Future<void> _savePayrollEntry() async {
+    // Prevent double submission
+    if (_isSaving) {
+      debugPrint(
+          '👥 [AddPayrollDialog] Save already in progress, ignoring duplicate request');
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedEmployee == null) {
@@ -213,7 +221,10 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isSaving = true;
+    });
 
     try {
       debugPrint('👥 === SAVING PAYROLL ENTRY ===');
@@ -299,7 +310,12 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -594,14 +610,25 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed: _savePayrollEntry,
+                          onPressed: _isSaving
+                              ? null
+                              : _savePayrollEntry, // Disable when saving
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 24, vertical: 12),
                           ),
-                          child: const Text('Save Payroll Entry'),
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Save Payroll Entry'),
                         ),
                       ],
                     ),

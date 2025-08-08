@@ -2,22 +2,23 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../models/accounting_models.dart';
 import '../context/simple_company_context.dart';
+import '../dialogs/add_payroll_dialog.dart';
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
 
-class BankStatementsPage extends StatefulWidget {
-  const BankStatementsPage({super.key});
+class PayrollPage extends StatefulWidget {
+  const PayrollPage({super.key});
 
   @override
-  State<BankStatementsPage> createState() => _BankStatementsPageState();
+  State<PayrollPage> createState() => _PayrollPageState();
 }
 
-class _BankStatementsPageState extends State<BankStatementsPage> {
+class _PayrollPageState extends State<PayrollPage> {
   final DatabaseService _dbService = DatabaseService();
-  List<BankStatement> _bankStatements = [];
-  List<BankStatement> _filteredBankStatements = [];
+  List<PayrollEntry> _payrollEntries = [];
+  List<PayrollEntry> _filteredPayrollEntries = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
 
@@ -25,8 +26,8 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
   void initState() {
     super.initState();
     _initializeCompanyContext();
-    _loadBankStatements();
-    _searchController.addListener(_filterBankStatements);
+    _loadPayrollEntries();
+    _searchController.addListener(_filterPayrollEntries);
   }
 
   void _initializeCompanyContext() {
@@ -37,9 +38,9 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
         isDemoMode: selectedCompany.isDemo,
       );
       debugPrint(
-          '🏦 BankStatementsPage: Set company context - ID: ${selectedCompany.id}, Demo: ${selectedCompany.isDemo}');
+          '💰 PayrollPage: Set company context - ID: ${selectedCompany.id}, Demo: ${selectedCompany.isDemo}');
     } else {
-      debugPrint('🏦 BankStatementsPage: No company context available');
+      debugPrint('💰 PayrollPage: No company context available');
     }
   }
 
@@ -49,7 +50,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
     super.dispose();
   }
 
-  Future<void> _loadBankStatements() async {
+  Future<void> _loadPayrollEntries() async {
     if (!mounted) return;
 
     setState(() {
@@ -62,36 +63,48 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
         throw Exception('No company selected');
       }
 
-      final bankStatements = await _dbService.getBankStatements();
+      final payrollEntries = await _dbService.getPayrollEntries();
 
       if (mounted) {
         setState(() {
-          _bankStatements = bankStatements;
-          _filteredBankStatements = bankStatements;
+          _payrollEntries = payrollEntries;
+          _filteredPayrollEntries = payrollEntries;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('❌ Error loading bank statements: $e');
+      debugPrint('❌ Error loading payroll entries: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        _showSnackBar('Failed to load bank statements: $e', isError: true);
+        _showSnackBar('Failed to load payroll entries: $e', isError: true);
       }
     }
   }
 
-  void _filterBankStatements() {
+  void _filterPayrollEntries() {
     if (!mounted) return;
 
     final searchTerm = _searchController.text.toLowerCase();
     setState(() {
-      _filteredBankStatements = _bankStatements.where((statement) {
-        return statement.description.toLowerCase().contains(searchTerm) ||
-            statement.transactionType.toLowerCase().contains(searchTerm);
+      _filteredPayrollEntries = _payrollEntries.where((entry) {
+        return entry.employeeName.toLowerCase().contains(searchTerm) ||
+            entry.period.toLowerCase().contains(searchTerm);
       }).toList();
     });
+  }
+
+  void _showAddPayrollDialog() async {
+    final result = await showDialog<PayrollEntry>(
+      context: context,
+      builder: (context) => const AddPayrollDialog(),
+    );
+
+    if (result != null) {
+      debugPrint('💰 Payroll dialog completed, refreshing entries...');
+      await _loadPayrollEntries();
+    }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -107,11 +120,10 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
   }
 
   // Attachment upload function
-  Future<void> _uploadBankStatementAttachment(
-      BankStatement bankStatement) async {
+  Future<void> _uploadPayrollAttachment(PayrollEntry payrollEntry) async {
     try {
       debugPrint(
-          '📄 Starting bank statement attachment upload for statement: ${bankStatement.id}');
+          '📄 Starting payroll attachment upload for entry: ${payrollEntry.id}');
 
       final html.FileUploadInputElement uploadInput =
           html.FileUploadInputElement();
@@ -140,8 +152,8 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
               final uri =
                   Uri.parse('http://localhost:8000/attachments/upload').replace(
                 queryParameters: {
-                  'entity_type': 'bank_statement',
-                  'entity_id': bankStatement.id.toString(),
+                  'entity_type': 'payroll_entry',
+                  'entity_id': payrollEntry.id.toString(),
                   'company_id': _dbService.currentCompanyId ?? '1',
                 },
               );
@@ -198,14 +210,13 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
   }
 
   // View attachments function
-  Future<void> _viewBankStatementAttachments(
-      BankStatement bankStatement) async {
+  Future<void> _viewPayrollAttachments(PayrollEntry payrollEntry) async {
     try {
       debugPrint(
-          '📄 Fetching bank statement attachments for statement: ${bankStatement.id}');
+          '📄 Fetching payroll attachments for entry: ${payrollEntry.id}');
 
       final uri = Uri.parse(
-              'http://localhost:8000/attachments/bank_statement/${bankStatement.id}')
+              'http://localhost:8000/attachments/payroll_entry/${payrollEntry.id}')
           .replace(
         queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1',
@@ -223,11 +234,11 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
         debugPrint('📄 Found ${attachments.length} attachments');
 
         if (attachments.isEmpty) {
-          _showSnackBar('No attachments found for this bank statement');
+          _showSnackBar('No attachments found for this payroll entry');
           return;
         }
 
-        _showAttachmentsDialog(bankStatement, attachments);
+        _showAttachmentsDialog(payrollEntry, attachments);
       } else {
         debugPrint('📄 Failed to fetch attachments: ${response.statusCode}');
         _showSnackBar('Failed to fetch attachments: ${response.statusCode}',
@@ -241,12 +252,12 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
 
   // Show attachments dialog
   void _showAttachmentsDialog(
-      BankStatement bankStatement, List<dynamic> attachments) {
+      PayrollEntry payrollEntry, List<dynamic> attachments) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Attachments for ${bankStatement.description}'),
+          title: Text('Attachments for ${payrollEntry.employeeName}'),
           content: SizedBox(
             width: double.maxFinite,
             height: 300,
@@ -441,11 +452,51 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
     }
   }
 
+  void _deletePayrollEntry(PayrollEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Payroll Entry'),
+          content: Text(
+              'Are you sure you want to delete payroll entry for ${entry.employeeName}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        final company = SimpleCompanyContext.selectedCompany;
+        if (company == null) return;
+
+        await _dbService.deletePayrollEntry(entry.id);
+        _loadPayrollEntries();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payroll entry deleted successfully')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete payroll entry: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('All Bank Statements'),
+        title: const Text('All Payroll Entries'),
         backgroundColor: const Color(0xFFF8FAFC),
         elevation: 0,
         titleTextStyle: const TextStyle(
@@ -461,42 +512,64 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
           // Header and controls
           Container(
             padding: const EdgeInsets.all(24),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search bank statements...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search payroll entries...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: _showAddPayrollDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Payroll Entry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
+              ],
             ),
           ),
-          // Bank statements list
+          // Payroll entries list
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _filteredBankStatements.isEmpty
+                  : _filteredPayrollEntries.isEmpty
                       ? const Center(
                           child: Text(
-                            'No bank statements found',
+                            'No payroll entries found',
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                         )
                       : ListView.builder(
-                          itemCount: _filteredBankStatements.length,
+                          itemCount: _filteredPayrollEntries.length,
                           itemBuilder: (context, index) {
-                            final statement = _filteredBankStatements[index];
-                            return _buildBankStatementCard(statement);
+                            final entry = _filteredPayrollEntries[index];
+                            return _buildPayrollCard(entry);
                           },
                         ),
             ),
@@ -506,9 +579,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
     );
   }
 
-  Widget _buildBankStatementCard(BankStatement statement) {
-    final isCredit = statement.transactionType.toLowerCase() == 'credit';
-
+  Widget _buildPayrollCard(PayrollEntry entry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
@@ -527,116 +598,18 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with description and transaction type
+          // Header row with employee name and action buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
-                  statement.description,
+                  entry.employeeName,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1E293B),
                   ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isCredit
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  statement.transactionType.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isCredit ? Colors.green : Colors.red,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Amount and date
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Transaction Date',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${statement.transactionDate.day}/${statement.transactionDate.month}/${statement.transactionDate.year}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Amount',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${isCredit ? '+' : '-'}\$${statement.amount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isCredit ? Colors.green : Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Balance
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Balance',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '\$${statement.balance.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -656,19 +629,120 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
                 icon: Icons.attach_file,
                 label: 'Add Attachment',
                 color: Colors.green,
-                onPressed: () => _uploadBankStatementAttachment(statement),
+                onPressed: () => _uploadPayrollAttachment(entry),
               ),
               _buildActionButton(
                 icon: Icons.visibility,
                 label: 'View Attachments',
                 color: Colors.orange,
-                onPressed: () => _viewBankStatementAttachments(statement),
+                onPressed: () => _viewPayrollAttachments(entry),
               ),
               _buildActionButton(
                 icon: Icons.delete,
                 label: 'Delete',
                 color: Colors.red,
-                onPressed: () => {}, // TODO: Add delete functionality
+                onPressed: () => _deletePayrollEntry(entry),
+              ),
+            ],
+          ),
+          // Period and gross pay
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Period',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      entry.period,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Gross Pay',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '\$${entry.grossPay.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Deductions and Net Pay
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Deductions',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '\$${entry.deductions.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Net Pay',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '\$${entry.netPay.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
