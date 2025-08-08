@@ -1351,9 +1351,14 @@ class DatabaseService {
     }
 
     try {
+      // Build URL correctly with attachment ID in path and company_id as query param
+      String baseUrl = _isDemoMode
+          ? '$_baseUrl/demo/attachments/$attachmentId'
+          : '$_baseUrl/attachments/$attachmentId?company_id=$_currentCompanyId';
+
       final response = await http
           .delete(
-            Uri.parse('${_buildUrl('attachments')}/$attachmentId'),
+            Uri.parse(baseUrl),
             headers: _headers,
           )
           .timeout(const Duration(seconds: 30));
@@ -1398,27 +1403,68 @@ class DatabaseService {
           '📥 Download response body length: ${downloadResponse.body.length}');
 
       if (downloadResponse.statusCode == 200) {
-        final downloadData = jsonDecode(downloadResponse.body);
-        debugPrint('📥 Download response keys: ${downloadData.keys.toList()}');
+        // Check content type to determine response format
+        final contentType = downloadResponse.headers['content-type'] ?? '';
 
-        if (downloadData['file_data'] != null &&
-            downloadData['file_data'].toString().isNotEmpty &&
-            downloadData['file_data'] != 'null') {
-          debugPrint('📥 === USING BACKEND DOWNLOAD DATA ===');
-          debugPrint('📥 File: ${downloadData['filename']}');
-          debugPrint('📥 Size: ${downloadData['file_size']} bytes');
+        if (contentType.startsWith('application/json')) {
+          // Old format: JSON response with base64 data
+          debugPrint('📥 === LEGACY JSON RESPONSE FORMAT ===');
+          final downloadData = jsonDecode(downloadResponse.body);
           debugPrint(
-              '📥 Base64 length: ${downloadData['file_data'].toString().length} characters');
+              '📥 Download response keys: ${downloadData.keys.toList()}');
 
-          return await _deserializeBase64Data(
-              downloadData['file_data'].toString(),
-              downloadData['filename'] ?? 'document.pdf',
-              downloadData['mime_type'] ?? 'application/pdf',
-              documentId);
+          if (downloadData['file_data'] != null &&
+              downloadData['file_data'].toString().isNotEmpty &&
+              downloadData['file_data'] != 'null') {
+            debugPrint('📥 === USING BACKEND DOWNLOAD DATA ===');
+            debugPrint('📥 File: ${downloadData['filename']}');
+            debugPrint('📥 Size: ${downloadData['file_size']} bytes');
+            debugPrint(
+                '📥 Base64 length: ${downloadData['file_data'].toString().length} characters');
+
+            return await _deserializeBase64Data(
+                downloadData['file_data'].toString(),
+                downloadData['filename'] ?? 'document.pdf',
+                downloadData['mime_type'] ?? 'application/pdf',
+                documentId);
+          } else {
+            debugPrint(
+                '📥 Backend download endpoint returned no file_data or null');
+            debugPrint('📥 Response data: $downloadData');
+          }
         } else {
+          // New format: Direct file content
+          debugPrint('📥 === NEW STREAMING RESPONSE FORMAT ===');
+          debugPrint('📥 Content-Type: $contentType');
+
+          // Extract filename from Content-Disposition header
+          final contentDisposition =
+              downloadResponse.headers['content-disposition'] ?? '';
+          String filename = 'document.pdf';
+          if (contentDisposition.isNotEmpty) {
+            // Handle both quoted and unquoted filenames, and clean up any newlines
+            final cleanDisposition =
+                contentDisposition.replaceAll('\n', '').replaceAll('\r', '');
+            final match = RegExp(r'filename[*]?=(?:"([^"]+)"|([^;\s]+))')
+                .firstMatch(cleanDisposition);
+            if (match != null) {
+              filename =
+                  (match.group(1) ?? match.group(2))?.trim() ?? 'document.pdf';
+            }
+          }
+
+          debugPrint('📥 Extracted filename: $filename');
           debugPrint(
-              '📥 Backend download endpoint returned no file_data or null');
-          debugPrint('📥 Response data: $downloadData');
+              '📥 File size: ${downloadResponse.bodyBytes.length} bytes');
+
+          // Return the file data directly
+          final base64Data = base64Encode(downloadResponse.bodyBytes);
+          return {
+            'filename': filename,
+            'file_data': base64Data,
+            'mime_type': contentType,
+            'file_size': downloadResponse.bodyBytes.length,
+          };
         }
       } else {
         debugPrint(

@@ -62,6 +62,56 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Helper function to decode Unicode filename strings
+  String _decodeFilename(String filename) {
+    try {
+      debugPrint('🔍 _decodeFilename input: $filename');
+      debugPrint('🔍 Input runes: ${filename.runes.toList()}');
+
+      // First check if it contains Unicode escape sequences like \u0421
+      if (filename.contains(r'\u')) {
+        // Convert Unicode escape sequences to actual characters
+        String decoded = filename;
+        final unicodePattern = RegExp(r'\\u([0-9A-Fa-f]{4})');
+        decoded = decoded.replaceAllMapped(unicodePattern, (match) {
+          final hexCode = match.group(1)!;
+          final charCode = int.parse(hexCode, radix: 16);
+          return String.fromCharCode(charCode);
+        });
+        debugPrint('🔍 Decoded from escape sequences: $decoded');
+        return decoded;
+      }
+
+      // Try URL decoding if it contains percent encoding
+      if (filename.contains('%')) {
+        final decoded = Uri.decodeComponent(filename);
+        debugPrint('🔍 Decoded from URL encoding: $decoded');
+        return decoded;
+      }
+
+      // If it looks like it has replacement characters, try to fix encoding issues
+      if (filename.contains('�') || filename.contains('Ð')) {
+        debugPrint('🔍 Detected potential encoding issues');
+        // Try to re-encode as Latin-1 and decode as UTF-8
+        try {
+          final bytes = latin1.encode(filename);
+          final decoded = utf8.decode(bytes);
+          debugPrint('🔍 Re-encoded and decoded: $decoded');
+          return decoded;
+        } catch (e) {
+          debugPrint('🔍 Re-encoding failed: $e');
+        }
+      }
+
+      // Return as-is if no special encoding detected
+      debugPrint('🔍 Returning filename as-is: $filename');
+      return filename;
+    } catch (e) {
+      debugPrint('🔍 Failed to decode filename: $filename, error: $e');
+      return filename; // Return original if decoding fails
+    }
+  }
+
   Future<void> _loadDashboardData() async {
     setState(() {
       _isLoading = true;
@@ -209,14 +259,14 @@ class _HomePageState extends State<HomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('PDF Attachments - ${entityType.toUpperCase()}'),
+        title: Text('File Attachments - ${entityType.toUpperCase()}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.upload_file, color: Colors.blue),
-              title: const Text('Upload PDF'),
-              subtitle: const Text('Attach a PDF document'),
+              title: const Text('Upload File'),
+              subtitle: const Text('Attach a document (PDF, images, etc.)'),
               onTap: () {
                 Navigator.pop(context);
                 _uploadPDF(entityType, entityId);
@@ -225,7 +275,7 @@ class _HomePageState extends State<HomePage> {
             ListTile(
               leading: const Icon(Icons.folder_open, color: Colors.green),
               title: const Text('View Attachments'),
-              subtitle: const Text('See all attached PDFs'),
+              subtitle: const Text('See all attached files'),
               onTap: () {
                 Navigator.pop(context);
                 _viewPDFAttachments(entityType, entityId);
@@ -246,8 +296,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _uploadPDF(String entityType, String entityId) async {
     try {
       if (kIsWeb) {
-        // Web file picker
-        final input = html.FileUploadInputElement()..accept = '.pdf';
+        // Web file picker - accept multiple file types
+        final input = html.FileUploadInputElement()
+          ..accept = '.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.xls,.xlsx';
         input.click();
 
         input.onChange.listen((e) async {
@@ -255,8 +306,11 @@ class _HomePageState extends State<HomePage> {
           if (files!.isEmpty) return;
 
           final file = files[0];
-          if (!file.name.toLowerCase().endsWith('.pdf')) {
-            _showSnackBar('Please select a PDF file', isError: true);
+
+          // Validate file size (25MB limit)
+          if (file.size > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.',
+                isError: true);
             return;
           }
 
@@ -266,68 +320,85 @@ class _HomePageState extends State<HomePage> {
             try {
               final bytes = reader.result as List<int>;
               await _uploadPDFToServer(entityType, entityId, file.name, bytes);
-              _showSnackBar('PDF uploaded successfully!');
+              _showSnackBar('File uploaded successfully!');
             } catch (e) {
-              _showSnackBar('Failed to upload PDF: $e', isError: true);
+              _showSnackBar('Failed to upload file: $e', isError: true);
             }
           });
         });
       } else {
-        // Mobile file picker
+        // Mobile file picker - allow various file types
         final result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['pdf'],
+          type: FileType.any,
+          allowedExtensions: null, // Allow all file types
         );
 
         if (result != null && result.files.single.bytes != null) {
           final file = result.files.single;
+
+          // Validate file size
+          if (file.size > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.',
+                isError: true);
+            return;
+          }
+
           await _uploadPDFToServer(
               entityType, entityId, file.name, file.bytes!);
-          _showSnackBar('PDF uploaded successfully!');
+          _showSnackBar('File uploaded successfully!');
         }
       }
     } catch (e) {
-      _showSnackBar('Failed to upload PDF: $e', isError: true);
+      _showSnackBar('Failed to upload file: $e', isError: true);
     }
   }
 
   Future<void> _uploadPDFToServer(String entityType, String entityId,
       String filename, List<int> bytes) async {
-    debugPrint('📎 === PDF UPLOAD ATTEMPT ===');
+    debugPrint('📎 === NEW ATTACHMENT UPLOAD ===');
     debugPrint('📎 Entity Type: $entityType');
     debugPrint('📎 Entity ID: $entityId');
     debugPrint('📎 Company ID: ${_dbService.currentCompanyId}');
     debugPrint('📎 Filename: $filename');
     debugPrint('📎 File Size: ${bytes.length} bytes');
 
-    // Backend expects all parameters as query parameters
-    final queryParams = {
-      'entity_type': entityType,
-      'entity_id': entityId,
-      'company_id': _dbService.currentCompanyId ?? '1',
-      'filename': filename,
-      'file_data':
-          base64Encode(bytes), // Convert bytes to base64 for query param
-    };
-
-    final url = Uri.parse('http://localhost:8000/documents/upload')
-        .replace(queryParameters: queryParams);
-    debugPrint('📎 Upload URL: $url');
-
-    debugPrint('📎 Request query params: $queryParams');
-
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+      // Use the new multipart form upload to the refactored attachment system
+      final uri = Uri.parse('http://localhost:8000/attachments/upload').replace(
+        queryParameters: {
+          'entity_type': entityType,
+          'entity_id': entityId,
+          'company_id': _dbService.currentCompanyId ?? '1',
         },
       );
 
+      debugPrint('📎 Upload URL: $uri');
+
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add the file as multipart form data (no base64 encoding needed!)
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+        ),
+      );
+
+      // Add description as form field
+      request.fields['description'] = 'Uploaded from PSC Accounting App';
+
+      // Add headers
+      request.headers.addAll({
+        'Accept': 'application/json',
+      });
+
+      debugPrint('📎 Sending multipart request...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
       debugPrint('📎 === UPLOAD RESPONSE ===');
       debugPrint('📎 Status Code: ${response.statusCode}');
-      debugPrint('📎 Response Headers: ${response.headers}');
       debugPrint('📎 Response Body: ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -339,6 +410,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       debugPrint('📎 === UPLOAD SUCCESS ===');
+      debugPrint('📎 File successfully uploaded to local storage');
     } catch (e) {
       debugPrint('📎 === UPLOAD ERROR ===');
       debugPrint('📎 Exception: $e');
@@ -368,22 +440,73 @@ class _HomePageState extends State<HomePage> {
               final attachments = snapshot.data ?? [];
 
               if (attachments.isEmpty) {
-                return const Center(child: Text('No PDF attachments found'));
+                return const Center(child: Text('No file attachments found'));
               }
 
               return ListView.builder(
                 itemCount: attachments.length,
                 itemBuilder: (context, index) {
                   final attachment = attachments[index];
+                  final rawFilename = attachment['original_filename'] ??
+                      attachment['filename'] ??
+                      'Unknown';
+
+                  // Decode the filename to handle Unicode characters properly
+                  final filename = _decodeFilename(rawFilename);
+
+                  debugPrint('🔍 Raw filename: $rawFilename');
+                  debugPrint('🔍 Decoded filename: $filename');
+                  debugPrint('🔍 Filename length: ${filename.length}');
+                  debugPrint(
+                      '🔍 First few chars: ${filename.length > 0 ? filename.substring(0, filename.length.clamp(0, 10)) : 'empty'}');
+
+                  // Determine file icon based on file extension
+                  IconData fileIcon = Icons.description;
+                  Color iconColor = Colors.grey;
+
+                  if (filename.toLowerCase().endsWith('.pdf')) {
+                    fileIcon = Icons.picture_as_pdf;
+                    iconColor = Colors.red;
+                  } else if (filename
+                      .toLowerCase()
+                      .contains(RegExp(r'\.(jpg|jpeg|png|gif)$'))) {
+                    fileIcon = Icons.image;
+                    iconColor = Colors.blue;
+                  } else if (filename
+                      .toLowerCase()
+                      .contains(RegExp(r'\.(doc|docx)$'))) {
+                    fileIcon = Icons.description;
+                    iconColor = Colors.blue[800]!;
+                  } else if (filename
+                      .toLowerCase()
+                      .contains(RegExp(r'\.(xls|xlsx)$'))) {
+                    fileIcon = Icons.table_chart;
+                    iconColor = Colors.green;
+                  } else if (filename.toLowerCase().endsWith('.txt')) {
+                    fileIcon = Icons.text_snippet;
+                    iconColor = Colors.grey[700]!;
+                  }
+
                   return ListTile(
-                    leading:
-                        const Icon(Icons.picture_as_pdf, color: Colors.red),
-                    title: Text(attachment['filename'] ?? 'Unknown'),
-                    subtitle:
-                        Text('${(attachment['file_size'] ?? 0) ~/ 1024} KB'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.download),
-                      onPressed: () => _downloadPDF(attachment['id']),
+                    leading: Icon(fileIcon, color: iconColor),
+                    title: Text(filename),
+                    subtitle: Text(attachment['file_size_human'] ??
+                        '${(attachment['file_size'] ?? 0) ~/ 1024} KB'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.download),
+                          onPressed: () => _downloadPDF(attachment['id']),
+                          tooltip: 'Download',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () =>
+                              _deletePDF(attachment['id'].toString(), filename),
+                          tooltip: 'Delete',
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -404,65 +527,198 @@ class _HomePageState extends State<HomePage> {
   Future<List<Map<String, dynamic>>> _getPDFAttachments(
       String entityType, String entityId) async {
     try {
+      // Use the new attachment listing endpoint
       final url =
-          Uri.parse('http://localhost:8000/documents/$entityType/$entityId');
+          Uri.parse('http://localhost:8000/attachments/$entityType/$entityId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
         }),
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Charset': 'utf-8',
+        },
       );
 
+      debugPrint('📎 === GET ATTACHMENTS ===');
+      debugPrint('📎 URL: $url');
+      debugPrint('📎 Status: ${response.statusCode}');
+      debugPrint('📎 Response body length: ${response.body.length}');
+      debugPrint('📎 Content-Type: ${response.headers['content-type']}');
+
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        // Explicitly decode as UTF-8
+        final responseBody = utf8.decode(response.bodyBytes);
+        final dynamic responseData = json.decode(responseBody);
+
+        // New attachment system returns an object with attachments array
+        if (responseData is Map<String, dynamic> &&
+            responseData.containsKey('attachments')) {
+          final List<dynamic> attachments = responseData['attachments'] ?? [];
+          debugPrint('📎 Found ${attachments.length} attachments');
+          return attachments.cast<Map<String, dynamic>>();
+        } else if (responseData is List) {
+          // Fallback for old format
+          debugPrint(
+              '📎 Found ${responseData.length} attachments (old format)');
+          return responseData.cast<Map<String, dynamic>>();
+        } else {
+          debugPrint('📎 Unexpected response format: $responseData');
+          return [];
+        }
       } else {
-        throw Exception('Failed to fetch attachments');
+        debugPrint('📎 Failed to fetch attachments: ${response.statusCode}');
+        throw Exception('Failed to fetch attachments: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching PDF attachments: $e');
+      debugPrint('📎 Error fetching attachments: $e');
       return [];
     }
   }
 
   Future<void> _downloadPDF(int documentId) async {
     try {
-      debugPrint('📥 === STARTING PDF DOWNLOAD ===');
-      debugPrint('📥 Document ID: $documentId');
+      debugPrint('📥 === STARTING ATTACHMENT DOWNLOAD ===');
+      debugPrint('📥 Attachment ID: $documentId');
 
-      final data = await _dbService.downloadAttachment(documentId);
+      // Use the new attachment download endpoint
+      final url =
+          Uri.parse('http://localhost:8000/attachments/download/$documentId');
+      final response = await http.get(
+        url.replace(queryParameters: {
+          'company_id': _dbService.currentCompanyId ?? '1'
+        }),
+      );
 
-      final filename = data['filename'];
-      final fileData = data['file_data'];
+      debugPrint('📥 Download Status: ${response.statusCode}');
+      debugPrint('📥 Content-Type: ${response.headers['content-type']}');
 
-      if (filename == null || fileData == null) {
-        throw Exception(
-            'Invalid download response: missing filename or file_data');
-      }
+      if (response.statusCode == 200) {
+        // Get filename from Content-Disposition header or use default
+        String filename = 'attachment';
+        final contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition != null) {
+          debugPrint('📥 Content-Disposition: $contentDisposition');
 
-      if (kIsWeb) {
-        // Web download
-        final bytes = base64.decode(fileData);
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.document.createElement('a') as html.AnchorElement
-          ..href = url
-          ..style.display = 'none'
-          ..download = filename;
-        html.document.body!.children.add(anchor);
-        anchor.click();
-        html.document.body!.children.remove(anchor);
-        html.Url.revokeObjectUrl(url);
+          // Try RFC 5987 encoding first (filename*=UTF-8''encoded_name)
+          final rfc5987Match = RegExp(r"filename\*=UTF-8''([^;]+)")
+              .firstMatch(contentDisposition);
+          if (rfc5987Match != null) {
+            final encodedFilename = rfc5987Match.group(1) ?? '';
+            try {
+              filename = Uri.decodeComponent(encodedFilename);
+              debugPrint('📥 Decoded RFC 5987 filename: $filename');
+            } catch (e) {
+              debugPrint('📥 Failed to decode RFC 5987 filename: $e');
+              // Fallback to simple quoted filename
+              final simpleMatch =
+                  RegExp(r'filename="([^"]+)"').firstMatch(contentDisposition);
+              if (simpleMatch != null) {
+                filename = simpleMatch.group(1) ?? filename;
+              }
+            }
+          } else {
+            // Fallback to simple quoted filename
+            final simpleMatch =
+                RegExp(r'filename="([^"]+)"').firstMatch(contentDisposition);
+            if (simpleMatch != null) {
+              filename = simpleMatch.group(1) ?? filename;
+            }
+          }
+        }
 
-        debugPrint('📥 === DOWNLOAD SUCCESS ===');
-        debugPrint('📥 File downloaded: $filename');
-        _showSnackBar('PDF downloaded successfully!');
+        debugPrint('📥 Final filename: $filename');
+
+        if (kIsWeb) {
+          // Web download - direct file streaming with proper MIME type
+          final bytes = response.bodyBytes;
+          final mimeType =
+              response.headers['content-type'] ?? 'application/octet-stream';
+
+          debugPrint('📥 Creating blob with MIME type: $mimeType');
+          debugPrint('📥 File size: ${bytes.length} bytes');
+
+          // Create blob with explicit MIME type
+          final blob = html.Blob([bytes], mimeType);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+
+          // Force download by using attachment disposition
+          final anchor = html.document.createElement('a') as html.AnchorElement
+            ..href = url
+            ..style.display = 'none'
+            ..download = filename
+            ..setAttribute('type', mimeType);
+
+          html.document.body!.children.add(anchor);
+          anchor.click();
+          html.document.body!.children.remove(anchor);
+          html.Url.revokeObjectUrl(url);
+
+          debugPrint('📥 === DOWNLOAD SUCCESS ===');
+          debugPrint('📥 File downloaded: $filename (${bytes.length} bytes)');
+          _showSnackBar('File downloaded successfully: $filename');
+        } else {
+          _showSnackBar('Download feature available on web only');
+        }
       } else {
-        _showSnackBar('Download feature available on web only');
+        throw Exception('Download failed: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('📥 === DOWNLOAD ERROR ===');
       debugPrint('📥 Exception: $e');
-      _showSnackBar('Failed to download PDF: $e', isError: true);
+      _showSnackBar('Failed to download file: $e', isError: true);
+    }
+  }
+
+  Future<void> _deletePDF(String attachmentId, String filename) async {
+    try {
+      debugPrint('🗑️ === DELETE ATTACHMENT ===');
+      debugPrint('🗑️ Attachment ID: $attachmentId');
+      debugPrint('🗑️ Filename: $filename');
+
+      // Show confirmation dialog
+      bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Delete Attachment'),
+            content: Text(
+                'Are you sure you want to delete "$filename"?\n\nThis action cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirmed != true) {
+        debugPrint('🗑️ Delete cancelled by user');
+        return;
+      }
+
+      await _dbService.deleteAttachment(attachmentId);
+
+      debugPrint('🗑️ Attachment deleted successfully');
+      _showSnackBar('Attachment "$filename" deleted successfully!');
+
+      // Close the PDF viewer dialog and refresh attachments
+      if (mounted) {
+        Navigator.of(context).pop();
+        // Optionally refresh the dashboard data
+        await _loadDashboardData();
+      }
+    } catch (e) {
+      debugPrint('🗑️ === DELETE ERROR ===');
+      debugPrint('🗑️ Exception: $e');
+      _showSnackBar('Failed to delete attachment: $e', isError: true);
     }
   }
 
