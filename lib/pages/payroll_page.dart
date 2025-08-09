@@ -455,7 +455,8 @@ class _PayrollPageState extends State<PayrollPage> {
   }
 
   void _editPayrollEntry(PayrollEntry entry) {
-    debugPrint('💰 [PayrollPage] Edit payroll entry clicked for: ${entry.employeeName}');
+    debugPrint(
+        '💰 [PayrollPage] Edit payroll entry clicked for: ${entry.employeeName}');
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -503,7 +504,7 @@ class _PayrollPageState extends State<PayrollPage> {
 
         await _dbService.deletePayrollEntry(entry.id);
         _loadPayrollEntries();
-        
+
         debugPrint('🗑️ Payroll entry deleted successfully');
         _showSnackBar('Payroll entry deleted successfully');
       } catch (e) {

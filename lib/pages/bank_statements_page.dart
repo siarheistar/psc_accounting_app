@@ -680,14 +680,16 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
   }
 
   void _editBankStatement(BankStatement statement) {
-    debugPrint('🏦 [BankStatementsPage] Edit bank statement clicked for: ${statement.description}');
+    debugPrint(
+        '🏦 [BankStatementsPage] Edit bank statement clicked for: ${statement.description}');
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return EditBankStatementDialog(bankStatement: statement);
       },
     ).then((_) {
-      debugPrint('🏦 [BankStatementsPage] Edit dialog closed, refreshing statements...');
+      debugPrint(
+          '🏦 [BankStatementsPage] Edit dialog closed, refreshing statements...');
       _loadBankStatements();
     });
   }
@@ -728,7 +730,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
 
         await _dbService.deleteBankStatement(statement.id);
         _loadBankStatements();
-        
+
         debugPrint('🗑️ Bank statement deleted successfully');
         _showSnackBar('Bank statement deleted successfully');
       } catch (e) {
