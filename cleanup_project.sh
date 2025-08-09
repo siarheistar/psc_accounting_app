@@ -90,18 +90,15 @@ echo -e "\n${BLUE}4. Removing unused Flutter debug/test files...${NC}"
 safe_remove "lib/debug/company_context_test.dart" "Company context test file (unused)"
 safe_remove "lib/widgets/database_connection_test.dart" "Database connection test widget (unused)"
 
-# 5. Clean up development environment files (optional)
+# 5. Clean up development environment files (optional - but preserve venv)
 echo -e "\n${BLUE}5. Cleaning development environment files...${NC}"
-read -p "Remove Python virtual environment? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    safe_remove "venv/" "Python virtual environment"
-fi
+log_warning "Python venv/ directory is PRESERVED - it's required for backend dependencies"
 
 read -p "Remove Node.js modules? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     safe_remove "node_modules/" "Node.js modules"
+    log_warning "You can recreate with: npm install"
 fi
 
 # 6. Remove obsolete Firebase and Google client files
@@ -136,17 +133,26 @@ if [ -d "backend/routes" ] && [ -f "backend/main.py" ]; then
     fi
 fi
 
-# 9. Clean up upload directories (optional)
-echo -e "\n${BLUE}9. Upload directories cleanup...${NC}"
-if [ -d "backend/uploads" ]; then
-    echo "Found backend/uploads directory with the following contents:"
-    ls -la backend/uploads/ 2>/dev/null || echo "  (empty or inaccessible)"
-    read -p "Remove backend/uploads directory? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        safe_remove "backend/uploads/" "Backend uploads directory"
-    fi
+# 9. Clean up upload directories (CAREFULLY - preserve active attachments)
+echo -e "\n${BLUE}9. Checking upload directories...${NC}"
+log_warning "backend/uploads/ is COMPLETELY PRESERVED - including empty folders (part of required architecture)"
+
+if [ -d "backend/uploads/" ]; then
+    echo "  backend/uploads/ directory preserved with all subdirectories (required architecture)"
+else
+    echo "  No backend/uploads/ directory found"
 fi
+
+# Check for other potential upload directories
+for dir in "uploads/" "files/" "attachments/" "temp_uploads/"; do
+    if [ -d "$dir" ] && [ "$dir" != "backend/uploads/" ]; then
+        read -p "Remove '$dir' directory? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            safe_remove "$dir" "upload directory"
+        fi
+    fi
+done
 
 # 10. Remove OS-specific files
 echo -e "\n${BLUE}10. Removing OS-specific files...${NC}"
@@ -175,6 +181,8 @@ echo "4. Test your application to ensure everything works correctly"
 echo -e "\n${YELLOW}📁 Directories that were preserved:${NC}"
 echo "- lib/ (your Flutter source code)"
 echo "- backend/ (main Python backend files)"
+echo "- backend/uploads/ (file attachment system - including all subdirectories)"
+echo "- venv/ (Python virtual environment)"
 echo "- android/, ios/, web/, windows/, linux/, macos/ (platform-specific code)"
 echo "- assets/ (application assets)"
 echo "- test/ (official Flutter test directory)"
