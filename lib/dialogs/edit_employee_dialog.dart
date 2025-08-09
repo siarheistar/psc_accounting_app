@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class EditEmployeeDialog extends StatefulWidget {
   final Employee employee;
@@ -26,8 +27,16 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
   late final TextEditingController _baseSalaryController;
 
   late DateTime? _hireDate;
-  late bool _isActive;
+  bool _isActive = true;
   bool _isLoading = false;
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency);
+    }
+    return '€'; // Default to Euro
+  }
 
   @override
   void initState() {
@@ -250,11 +259,11 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
                           // Base Salary
                           TextFormField(
                             controller: _baseSalaryController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Base Salary',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.attach_money),
-                              prefixText: '\$',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.attach_money),
+                              prefixText: _getCurrencySymbol(),
                               helperText: 'Annual base salary (optional)',
                             ),
                             keyboardType: TextInputType.number,

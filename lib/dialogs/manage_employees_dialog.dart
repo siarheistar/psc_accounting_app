@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 import 'add_employee_dialog.dart';
 import 'edit_employee_dialog.dart';
 
@@ -17,6 +18,14 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
   List<Employee> _employees = [];
   bool _isLoading = true;
   String? _error;
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency);
+    }
+    return '€'; // Default to Euro
+  }
 
   @override
   void initState() {
@@ -253,7 +262,7 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                           Text('Email: ${employee.email}'),
                                         if (employee.baseSalary != null)
                                           Text(
-                                              'Base Salary: \$${employee.baseSalary!.toStringAsFixed(2)}'),
+                                              'Base Salary: ${_getCurrencySymbol()}${employee.baseSalary!.toStringAsFixed(2)}'),
                                       ],
                                     ),
                                     trailing: Row(
