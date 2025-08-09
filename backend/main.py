@@ -21,6 +21,12 @@ import attachment_endpoints
 
 app = FastAPI(title="PSC Accounting API", version="1.0.0")
 
+# ================== GLOBAL VARIABLES ==================
+
+# In-memory storage for created employees (for demo purposes)
+# In a real application, this would be stored in a database table
+created_employees = {}
+
 # ================== PYDANTIC MODELS ==================
 
 class Company(BaseModel):
@@ -217,6 +223,13 @@ async def get_companies(owner_email: str = Query(..., description="Email of the 
                 "address": row.get('address'),
                 "subscription_plan": row.get('subscription_plan', 'free'),
                 "is_demo": row.get('is_demo', False),
+                "status": row.get('status', 'active'),
+                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                # Add default values for fields not stored in database yet
+                "currency": "EUR",  # Default to EUR for existing companies
+                "country": "Ireland",  # Default to Ireland for existing companies  
+                "vat_number": None,  # No VAT stored for existing companies
+            
                 "status": row.get('status', 'active'),
                 "created_at": row['created_at'].isoformat() if row['created_at'] else None
             }
@@ -643,38 +656,59 @@ async def get_expense_categories():
 
 @app.get("/employees")
 async def get_employees(company_id: str = Query(..., description="Company ID")):
-    """Get list of employees for a company (extracted from payroll data)"""
+    """Get list of employees for a company (from payroll data + created employees)"""
     
     print(f"👥 [Backend] Getting employees for company: {company_id}")
     
     try:
-        # Extract unique employee names from payroll entries
-        query = """
+        # Get employees from payroll entries (existing functionality)
+        payroll_query = """
         SELECT DISTINCT employee_name
         FROM public.payroll 
         WHERE company_id = %s::VARCHAR AND employee_name IS NOT NULL
         ORDER BY employee_name
         """
         
-        result = execute_query(query, (company_id,), fetch=True)
+        payroll_result = execute_query(payroll_query, (company_id,), fetch=True)
         
         employees = []
-        for i, row in enumerate(result or [], 1):
+        
+        # Add employees from payroll
+        for i, row in enumerate(payroll_result or [], 1):
             employee = {
-                "id": str(i),  # Generate simple ID
+                "id": f"payroll_{i}",  # Generate simple ID for payroll employees
                 "name": row['employee_name'],
-                "company_id": company_id
+                "company_id": company_id,
+                "source": "payroll"
             }
             employees.append(employee)
         
-        print(f"👥 [Backend] Returning {len(employees)} employees")
+        # Add employees created through POST endpoint
+        created_for_company = created_employees.get(company_id, [])
+        for emp in created_for_company:
+            employees.append({
+                "id": emp["id"],
+                "name": emp["name"],
+                "company_id": company_id,
+                "email": emp.get("email"),
+                "phone_number": emp.get("phone_number"),
+                "position": emp.get("position"),
+                "department": emp.get("department"),
+                "base_salary": emp.get("base_salary"),
+                "hire_date": emp.get("hire_date"),
+                "is_active": emp.get("is_active", True),
+                "created_at": emp.get("created_at"),
+                "source": "created"
+            })
+        
+        print(f"👥 [Backend] Returning {len(employees)} employees (payroll: {len(payroll_result or [])}, created: {len(created_for_company)})")
         return employees
         
     except Exception as e:
         print(f"❌ [Backend] Error getting employees: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get employees: {str(e)}")
 
-@app.post("/employees")
+@app.post("/employees", status_code=201)
 async def create_employee(
     employee_data: dict,
     company_id: str = Query(..., description="Company ID")
@@ -719,12 +753,71 @@ async def create_employee(
             "created_at": "2025-08-09T12:00:00.000000"  # Current timestamp would be better
         }
         
+        # Store in memory for retrieval (demo purposes)
+        if company_id not in created_employees:
+            created_employees[company_id] = []
+        created_employees[company_id].append(employee)
+        
         print(f"✅ [Backend] Employee {name} created with ID: {employee_id}")
+        print(f"👥 [Backend] Total employees for company {company_id}: {len(created_employees.get(company_id, []))}")
         return employee
         
     except Exception as e:
         print(f"❌ [Backend] Error creating employee: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create employee: {str(e)}")
+
+@app.put("/employees/{employee_id}")
+async def update_employee(
+    employee_id: str,
+    employee_data: dict,
+    company_id: str = Query(..., description="Company ID")
+):
+    """Update an existing employee"""
+    
+    print(f"👥 [Backend] Updating employee {employee_id} for company: {company_id}")
+    print(f"👥 [Backend] Update data received: {employee_data}")
+    
+    try:
+        # Check if this is a payroll-extracted employee (has 'payroll_' prefix)
+        if employee_id.startswith('payroll_'):
+            print(f"❌ [Backend] Cannot update payroll-extracted employee {employee_id}")
+            print(f"❌ [Backend] Payroll-extracted employees are read-only")
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot update payroll-extracted employees. These are read-only records generated from payroll data."
+            )
+        
+        # Find the employee in our in-memory storage
+        company_employees = created_employees.get(company_id, [])
+        employee_found = False
+        
+        for i, emp in enumerate(company_employees):
+            if emp["id"] == employee_id:
+                # Update the employee data
+                emp.update({
+                    "name": employee_data.get('name', emp["name"]),
+                    "email": employee_data.get('email', emp.get("email")),
+                    "phone_number": employee_data.get('phone_number', emp.get("phone_number")),
+                    "position": employee_data.get('position', emp.get("position")),
+                    "department": employee_data.get('department', emp.get("department")),
+                    "base_salary": employee_data.get('base_salary', emp.get("base_salary")),
+                    "hire_date": employee_data.get('hire_date', emp.get("hire_date")),
+                    "is_active": employee_data.get('is_active', emp.get("is_active", True)),
+                })
+                employee_found = True
+                
+                print(f"✅ [Backend] Employee {employee_id} updated successfully")
+                return emp
+        
+        if not employee_found:
+            print(f"❌ [Backend] Employee {employee_id} not found for company {company_id}")
+            raise HTTPException(status_code=404, detail=f"Employee {employee_id} not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error updating employee: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update employee: {str(e)}")
 
 # ================== DASHBOARD ENDPOINT ==================
 

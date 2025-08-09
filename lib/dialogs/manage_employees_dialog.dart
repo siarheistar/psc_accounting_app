@@ -81,6 +81,15 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
   }
 
   Future<void> _editEmployee(Employee employee) async {
+    // Check if this is a payroll-extracted employee
+    if (employee.id.startsWith('payroll_')) {
+      _showSnackBar(
+        'Cannot edit this employee. Employees from payroll data are read-only.',
+        isError: true,
+      );
+      return;
+    }
+    
     final updatedEmployee = await showDialog<Employee>(
       context: context,
       builder: (context) => EditEmployeeDialog(employee: employee),
@@ -246,10 +255,34 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                         ),
                                       ),
                                     ),
-                                    title: Text(
-                                      employee.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            employee.name,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        if (employee.id.startsWith('payroll_'))
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.withOpacity(0.2),
+                                              border: Border.all(color: Colors.orange),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: const Text(
+                                              'From Payroll',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.orange,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment:
@@ -298,26 +331,59 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                                 break;
                                             }
                                           },
-                                          itemBuilder: (context) => [
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: ListTile(
-                                                leading: Icon(Icons.edit,
-                                                    color: Colors.blue),
-                                                title: Text('Edit'),
-                                                contentPadding: EdgeInsets.zero,
+                                          itemBuilder: (context) {
+                                            // Check if this is a payroll-extracted employee
+                                            final isPayrollEmployee = employee.id.startsWith('payroll_');
+                                            
+                                            return [
+                                              PopupMenuItem(
+                                                value: 'edit',
+                                                enabled: !isPayrollEmployee,
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons.edit,
+                                                    color: isPayrollEmployee 
+                                                        ? Colors.grey 
+                                                        : Colors.blue,
+                                                  ),
+                                                  title: Text(
+                                                    isPayrollEmployee 
+                                                        ? 'Edit (Read-only)'
+                                                        : 'Edit',
+                                                    style: TextStyle(
+                                                      color: isPayrollEmployee 
+                                                          ? Colors.grey 
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
                                               ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: ListTile(
-                                                leading: Icon(Icons.delete,
-                                                    color: Colors.red),
-                                                title: Text('Delete'),
-                                                contentPadding: EdgeInsets.zero,
+                                              PopupMenuItem(
+                                                value: 'delete',
+                                                enabled: !isPayrollEmployee,
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons.delete,
+                                                    color: isPayrollEmployee 
+                                                        ? Colors.grey 
+                                                        : Colors.red,
+                                                  ),
+                                                  title: Text(
+                                                    isPayrollEmployee 
+                                                        ? 'Delete (Read-only)'
+                                                        : 'Delete',
+                                                    style: TextStyle(
+                                                      color: isPayrollEmployee 
+                                                          ? Colors.grey 
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ];
+                                          },
                                         ),
                                       ],
                                     ),
