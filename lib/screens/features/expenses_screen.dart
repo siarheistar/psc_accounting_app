@@ -5,6 +5,7 @@ import '../../context/simple_company_context.dart';
 import '../../services/refresh_notifier.dart';
 import '../../models/accounting_models.dart';
 import '../../dialogs/edit_expense_dialog.dart';
+import '../../utils/currency_utils.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -68,6 +69,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    return CurrencyUtils.getCurrencySymbol(selectedCompany?.currency);
+  }
+
   Future<void> _createExpense() async {
     final selectedCompany = SimpleCompanyContext.selectedCompany;
     if (selectedCompany == null) return;
@@ -93,10 +99,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Amount',
                 hintText: 'Enter amount',
-                prefixText: '\$',
+                prefixText: '${_getCurrencySymbol()} ',
               ),
               keyboardType: TextInputType.number,
             ),
@@ -253,7 +259,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             const SizedBox(height: 8),
             Text('Description: ${expense['description'] ?? 'N/A'}'),
             Text('Category: ${expense['category'] ?? 'N/A'}'),
-            Text('Amount: \$${expense['amount'] ?? 0}'),
+            Text('Amount: ${_getCurrencySymbol()}${expense['amount'] ?? 0}'),
             Text('Date: ${expense['date'] ?? 'N/A'}'),
             const SizedBox(height: 8),
             const Text(
@@ -425,7 +431,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                   children: [
                                     const SizedBox(height: 4),
                                     Text('Date: ${expense['date']}'),
-                                    Text('Amount: \$${expense['amount']}'),
+                                    Text(
+                                        'Amount: ${_getCurrencySymbol()}${expense['amount']}'),
                                     const SizedBox(height: 4),
                                     Container(
                                       padding: const EdgeInsets.symmetric(

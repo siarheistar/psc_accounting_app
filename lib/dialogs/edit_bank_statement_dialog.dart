@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class EditBankStatementDialog extends StatefulWidget {
   final BankStatement bankStatement;
@@ -64,6 +65,14 @@ class _EditBankStatementDialogState extends State<EditBankStatementDialog> {
     } else {
       debugPrint('🏦 EditBankStatementDialog: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   void _initializeControllers() {
@@ -355,10 +364,10 @@ class _EditBankStatementDialogState extends State<EditBankStatementDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _amountController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Amount',
-                          border: OutlineInputBorder(),
-                          prefixText: '\$',
+                          border: const OutlineInputBorder(),
+                          prefixText: _getCurrencySymbol(),
                         ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [

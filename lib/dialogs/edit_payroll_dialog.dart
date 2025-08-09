@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class EditPayrollDialog extends StatefulWidget {
   final PayrollEntry payrollEntry;
@@ -70,6 +71,14 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
     } else {
       debugPrint('👥 EditPayrollDialog: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   @override
@@ -377,11 +386,11 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
                           // Gross Pay
                           TextFormField(
                             controller: _grossPayController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Gross Pay',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.attach_money),
-                              prefixText: '\$',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.attach_money),
+                              prefixText: _getCurrencySymbol(),
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
@@ -406,11 +415,12 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
                           // Deductions
                           TextFormField(
                             controller: _deductionsController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Deductions',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.remove_circle_outline),
-                              prefixText: '\$',
+                              border: const OutlineInputBorder(),
+                              prefixIcon:
+                                  const Icon(Icons.remove_circle_outline),
+                              prefixText: _getCurrencySymbol(),
                               helperText: 'Tax, insurance, pension, etc.',
                             ),
                             keyboardType: TextInputType.number,
@@ -436,11 +446,12 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
                           // Net Pay (Auto-calculated)
                           TextFormField(
                             controller: _netPayController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Net Pay',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.account_balance_wallet),
-                              prefixText: '\$',
+                              border: const OutlineInputBorder(),
+                              prefixIcon:
+                                  const Icon(Icons.account_balance_wallet),
+                              prefixText: _getCurrencySymbol(),
                               helperText: 'Automatically calculated',
                             ),
                             readOnly: true,
@@ -517,7 +528,8 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           const Text('Gross Pay:'),
-                                          Text('\$$grossText'),
+                                          Text(
+                                              '${_getCurrencySymbol()}$grossText'),
                                         ],
                                       ),
                                       Row(
@@ -525,7 +537,8 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           const Text('Deductions:'),
-                                          Text('-\$$deductionsText'),
+                                          Text(
+                                              '-${_getCurrencySymbol()}$deductionsText'),
                                         ],
                                       ),
                                       const Divider(),
@@ -539,7 +552,7 @@ class _EditPayrollDialogState extends State<EditPayrollDialog> {
                                                 fontWeight: FontWeight.bold),
                                           ),
                                           Text(
-                                            '\$$netText',
+                                            '${_getCurrencySymbol()}$netText',
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
                                               color: Color(0xFF10B981),

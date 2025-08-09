@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class AddExpenseDialog extends StatefulWidget {
   const AddExpenseDialog({super.key});
@@ -56,6 +57,14 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     } else {
       debugPrint('💰 AddExpenseDialog: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   @override
@@ -296,11 +305,11 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                             // Amount
                             TextFormField(
                               controller: _amountController,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Amount',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.attach_money),
-                                prefixText: '\$',
+                                border: const OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.attach_money),
+                                prefixText: _getCurrencySymbol(),
                               ),
                               keyboardType: TextInputType.number,
                               inputFormatters: [

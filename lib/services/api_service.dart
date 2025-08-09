@@ -215,6 +215,33 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> updateCompany(
+      String companyId, Map<String, dynamic> company) async {
+    print('🏢 [ApiService] Updating company $companyId with data: $company');
+
+    final uri = Uri.parse('$baseUrl/companies/$companyId');
+    print('🌐 [ApiService] Sending PUT request to: $uri');
+
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(company),
+    );
+
+    print('📡 [ApiService] Response status: ${response.statusCode}');
+    print('📋 [ApiService] Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+      print('✅ [ApiService] Company updated successfully: $result');
+      return result;
+    } else {
+      print(
+          '❌ [ApiService] Failed to update company - Status: ${response.statusCode}, Body: ${response.body}');
+      throw Exception('Failed to update company: ${response.body}');
+    }
+  }
+
   static Future<Map<String, dynamic>> getCompany(String companyId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/companies/$companyId'),

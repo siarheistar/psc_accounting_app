@@ -8,6 +8,7 @@ import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
+import '../utils/currency_utils.dart';
 
 class PayrollPage extends StatefulWidget {
   const PayrollPage({super.key});
@@ -43,6 +44,14 @@ class _PayrollPageState extends State<PayrollPage> {
     } else {
       debugPrint('💰 PayrollPage: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   @override
@@ -707,7 +716,7 @@ class _PayrollPageState extends State<PayrollPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '\$${entry.grossPay.toStringAsFixed(2)}',
+                    '${_getCurrencySymbol()}${entry.grossPay.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -736,7 +745,7 @@ class _PayrollPageState extends State<PayrollPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '\$${entry.deductions.toStringAsFixed(2)}',
+                      '${_getCurrencySymbol()}${entry.deductions.toStringAsFixed(2)}',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],
@@ -756,7 +765,7 @@ class _PayrollPageState extends State<PayrollPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '\$${entry.netPay.toStringAsFixed(2)}',
+                      '${_getCurrencySymbol()}${entry.netPay.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

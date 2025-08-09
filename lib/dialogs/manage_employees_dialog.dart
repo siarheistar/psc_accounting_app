@@ -81,10 +81,10 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
   }
 
   Future<void> _editEmployee(Employee employee) async {
-    // Check if this is a payroll-extracted employee
+    // Check if this is a payroll-derived employee (read-only)
     if (employee.id.startsWith('payroll_')) {
       _showSnackBar(
-        'Cannot edit this employee. Employees from payroll data are read-only.',
+        'Payroll employees cannot be edited. Create a new employee record instead.',
         isError: true,
       );
       return;
@@ -255,37 +255,10 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                         ),
                                       ),
                                     ),
-                                    title: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            employee.name,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        if (employee.id.startsWith('payroll_'))
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.orange
-                                                  .withOpacity(0.2),
-                                              border: Border.all(
-                                                  color: Colors.orange),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: const Text(
-                                              'From Payroll',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.orange,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
+                                    title: Text(
+                                      employee.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment:
@@ -322,6 +295,26 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                               ),
                                             ),
                                           ),
+                                        if (employee.id.startsWith('payroll_'))
+                                          Container(
+                                            margin:
+                                                const EdgeInsets.only(left: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Text(
+                                              'PAYROLL',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                         const SizedBox(width: 8),
                                         PopupMenuButton<String>(
                                           onSelected: (value) {
@@ -335,11 +328,9 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                             }
                                           },
                                           itemBuilder: (context) {
-                                            // Check if this is a payroll-extracted employee
                                             final isPayrollEmployee = employee
                                                 .id
                                                 .startsWith('payroll_');
-
                                             return [
                                               PopupMenuItem(
                                                 value: 'edit',
@@ -352,9 +343,7 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                                         : Colors.blue,
                                                   ),
                                                   title: Text(
-                                                    isPayrollEmployee
-                                                        ? 'Edit (Read-only)'
-                                                        : 'Edit',
+                                                    'Edit',
                                                     style: TextStyle(
                                                       color: isPayrollEmployee
                                                           ? Colors.grey
@@ -376,9 +365,7 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                                         : Colors.red,
                                                   ),
                                                   title: Text(
-                                                    isPayrollEmployee
-                                                        ? 'Delete (Read-only)'
-                                                        : 'Delete',
+                                                    'Delete',
                                                     style: TextStyle(
                                                       color: isPayrollEmployee
                                                           ? Colors.grey

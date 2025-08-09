@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 import '../pages/invoices_page.dart';
 import '../pages/expenses_page.dart';
 import '../pages/payroll_page.dart';
@@ -64,6 +65,11 @@ class _HomePageState extends State<HomePage> {
     } else {
       debugPrint('🏠 HomePage: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    return CurrencyUtils.getCurrencySymbol(selectedCompany?.currency);
   }
 
   /// Helper function to decode Unicode filename strings
@@ -1011,21 +1017,21 @@ class _HomePageState extends State<HomePage> {
     final metrics = [
       {
         'title': 'Total Income',
-        'value': '\$${totalIncome.toStringAsFixed(2)}',
+        'value': '${_getCurrencySymbol()}${totalIncome.toStringAsFixed(2)}',
         'change': '+$totalInvoices invoices',
         'icon': Icons.trending_up,
         'color': Colors.green,
       },
       {
         'title': 'Total Expenses',
-        'value': '\$${totalExpenses.toStringAsFixed(2)}',
+        'value': '${_getCurrencySymbol()}${totalExpenses.toStringAsFixed(2)}',
         'change': '+${_expenses.length} expenses',
         'icon': Icons.trending_down,
         'color': Colors.red,
       },
       {
         'title': 'Net Profit',
-        'value': '\$${netProfit.toStringAsFixed(2)}',
+        'value': '${_getCurrencySymbol()}${netProfit.toStringAsFixed(2)}',
         'change': netProfit >= 0 ? 'Profit' : 'Loss',
         'icon': Icons.account_balance_wallet,
         'color': netProfit >= 0 ? Colors.blue : Colors.red,
@@ -1434,7 +1440,7 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '\$${invoice.amount.toStringAsFixed(2)}',
+                '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1548,7 +1554,7 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Text(
-                '\$${expense.amount.toStringAsFixed(2)}',
+                '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1642,7 +1648,7 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Text(
-                '\$${entry.netPay.toStringAsFixed(2)}',
+                '${_getCurrencySymbol()}${entry.netPay.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1738,7 +1744,7 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isCredit ? '+' : ''}\$${statement.amount.abs().toStringAsFixed(2)}',
+                '${isCredit ? '+' : ''}${_getCurrencySymbol()}${statement.amount.abs().toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1749,7 +1755,7 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Bal: \$${statement.balance.toStringAsFixed(2)}',
+                    'Bal: ${_getCurrencySymbol()}${statement.balance.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.grey[600],
@@ -1958,11 +1964,11 @@ class _HomePageState extends State<HomePage> {
             const Text('Financial Summary:',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             Text(
-                'Total Income: \$${(_metrics['invoices']?['total_invoice_amount'] ?? 0).toStringAsFixed(2)}'),
+                'Total Income: ${_getCurrencySymbol()}${(_metrics['invoices']?['total_invoice_amount'] ?? 0).toStringAsFixed(2)}'),
             Text(
-                'Total Expenses: \$${(_metrics['expenses']?['total_expense_amount'] ?? 0).toStringAsFixed(2)}'),
+                'Total Expenses: ${_getCurrencySymbol()}${(_metrics['expenses']?['total_expense_amount'] ?? 0).toStringAsFixed(2)}'),
             Text(
-                'Net Profit: \$${(_metrics['net_profit'] ?? 0).toStringAsFixed(2)}'),
+                'Net Profit: ${_getCurrencySymbol()}${(_metrics['net_profit'] ?? 0).toStringAsFixed(2)}'),
           ],
         ),
         actions: [

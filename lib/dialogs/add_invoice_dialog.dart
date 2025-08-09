@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class AddInvoiceDialog extends StatefulWidget {
   const AddInvoiceDialog({super.key});
@@ -89,6 +90,14 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
     }
 
     print('🔍 [DEBUG] === END COMPANY CONTEXT INITIALIZATION ===');
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   void _generateInvoiceNumber() {
@@ -281,10 +290,10 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _amountController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Amount',
-                    border: OutlineInputBorder(),
-                    prefixText: '\$',
+                    border: const OutlineInputBorder(),
+                    prefixText: _getCurrencySymbol(),
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [

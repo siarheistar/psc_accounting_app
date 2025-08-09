@@ -9,6 +9,7 @@ import '../models/accounting_models.dart';
 import '../context/simple_company_context.dart';
 import '../dialogs/add_invoice_dialog.dart';
 import '../dialogs/edit_invoice_dialog.dart';
+import '../utils/currency_utils.dart';
 
 class InvoicesPage extends StatefulWidget {
   const InvoicesPage({super.key});
@@ -45,6 +46,14 @@ class _InvoicesPageState extends State<InvoicesPage> {
     } else {
       debugPrint('📄 InvoicesPage: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   String _decodeFilename(String filename) {
@@ -909,7 +918,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '\$${invoice.amount.toStringAsFixed(2)}',
+                    '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

@@ -199,7 +199,7 @@ async def get_companies(owner_email: str = Query(..., description="Email of the 
         # Get companies directly from public.companies table
         companies_query = """
         SELECT id, name, slug, owner_email, phone, address, subscription_plan, 
-               is_demo, created_at, status
+               is_demo, created_at, status, vat_number, country, currency
         FROM public.companies 
         WHERE owner_email = %s AND status = 'active'
         ORDER BY created_at DESC
@@ -221,13 +221,10 @@ async def get_companies(owner_email: str = Query(..., description="Email of the 
                 "is_demo": row.get('is_demo', False),
                 "status": row.get('status', 'active'),
                 "created_at": row['created_at'].isoformat() if row['created_at'] else None,
-                # Add default values for fields not stored in database yet
-                "currency": "EUR",  # Default to EUR for existing companies
-                "country": "Ireland",  # Default to Ireland for existing companies  
-                "vat_number": None,  # No VAT stored for existing companies
-            
-                "status": row.get('status', 'active'),
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                # Get actual values from database instead of hardcoded defaults
+                "currency": row.get('currency', 'EUR'),
+                "country": row.get('country', 'Ireland'),
+                "vat_number": row.get('vat_number'),
             }
             companies.append(company)
         
@@ -239,14 +236,26 @@ async def get_companies(owner_email: str = Query(..., description="Email of the 
         raise HTTPException(status_code=500, detail=f"Failed to get companies: {str(e)}")
 
 @app.post("/companies")
-async def create_company(
-    name: str = Query(..., description="Company name"),
-    vat_number: Optional[str] = Query(None, description="VAT number"),
-    country: str = Query("Ireland", description="Country"),
-    currency: str = Query("EUR", description="Currency"),
-    owner_email: str = Query(..., description="Owner email")
-):
+async def create_company(company_data: dict):
     """Create a new company"""
+    
+    # Validate required fields
+    if not company_data.get('name'):
+        raise HTTPException(status_code=400, detail="Company name is required")
+    
+    if not company_data.get('owner_email'):
+        raise HTTPException(status_code=400, detail="Owner email is required")
+    
+    name = company_data['name']
+    owner_email = company_data['owner_email']
+    vat_number = company_data.get('vat_number')
+    country = company_data.get('country', 'Ireland')
+    currency = company_data.get('currency', 'EUR')
+    phone = company_data.get('phone', '')
+    address = company_data.get('address', '')
+    subscription_plan = company_data.get('subscription_plan', 'free')
+    is_demo = company_data.get('is_demo', False)
+    status = company_data.get('status', 'active')
     
     print(f"🏢 [Backend] Creating company: {name} for {owner_email}")
     print(f"🏢 [Backend] Company details - VAT: {vat_number}, Country: {country}, Currency: {currency}")
@@ -258,49 +267,447 @@ async def create_company(
         
         print(f"🏢 [Backend] Generated slug: {slug}")
         
-        # Create company in public.companies table with integer IDs (consistent with existing system)
+        # Create company in public.companies table with all fields
         company_query = """
-        INSERT INTO public.companies (name, slug, owner_email, status, subscription_plan, is_demo, created_at)
-        VALUES (%s, %s, %s, 'active', 'free', false, NOW())
-        RETURNING id, name, slug, owner_email, status, subscription_plan, is_demo, created_at
+        INSERT INTO public.companies (name, slug, owner_email, phone, address, subscription_plan, is_demo, status, vat_number, country, currency, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        RETURNING id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency
         """
         
         print(f"🏢 [Backend] Executing company creation query...")
-        result = execute_query(company_query, (name, slug, owner_email), fetch=True)
+        result = execute_query(company_query, (name, slug, owner_email, phone, address, subscription_plan, is_demo, status, vat_number, country, currency), fetch=True)
         
         if not result:
             raise HTTPException(status_code=500, detail="Failed to create company")
         
         print(f"🏢 [Backend] Company creation result: {result}")
+        print(f"🏢 [Backend] Result type: {type(result)}")
+        print(f"🏢 [Backend] Result length: {len(result) if hasattr(result, '__len__') else 'No length'}")
         
-        # Convert single row result to dict
-        row = dict(zip(['id', 'name', 'slug', 'owner_email', 'status', 'subscription_plan', 'is_demo', 'created_at'], result))
+        # For INSERT with RETURNING, result might be an integer (ID only) or a tuple
+        # Let's handle both cases safely
+        if isinstance(result, int):
+            # Only ID returned - fetch the full record
+            get_query = "SELECT id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency FROM public.companies WHERE id = %s"
+            full_result = execute_query(get_query, (result,), fetch=True)
+            if full_result and len(full_result) > 0:
+                result_row = full_result[0]
+                # Convert dict to tuple in the expected order
+                result = (
+                    result_row['id'], result_row['name'], result_row['slug'], result_row['owner_email'],
+                    result_row['phone'], result_row['address'], result_row['subscription_plan'], 
+                    result_row['is_demo'], result_row['created_at'], result_row['status'], 
+                    result_row['vat_number'], result_row['country'], result_row['currency']
+                )
+            else:
+                raise HTTPException(status_code=500, detail="Failed to retrieve created company")
         
-        print(f"🏢 [Backend] Company data row: {row}")
+        print(f"🏢 [Backend] Final result data: {result}")
         
-        # Return response with additional fields that frontend expects
+        # Return response with all fields from database
         company = {
-            "id": str(row['id']),  # Convert to string for JSON response, but it's an integer in DB
-            "name": row['name'],
-            "vat_number": vat_number,  # Include the VAT number from request
-            "country": country,  # Include country from request
-            "currency": currency,  # Include currency from request
-            "slug": row.get('slug'),
-            "owner_email": row['owner_email'], 
-            "phone": None,  # Not supported in current schema
-            "address": None,  # Not supported in current schema
-            "subscription_plan": row.get('subscription_plan', 'free'),
-            "is_demo": row.get('is_demo', False),
-            "status": row.get('status', 'active'),
-            "created_at": row['created_at'].isoformat() if row['created_at'] else None
+            "id": str(result[0]),  # Convert to string for JSON response
+            "name": result[1],
+            "slug": result[2],
+            "owner_email": result[3],
+            "phone": result[4],
+            "address": result[5],
+            "subscription_plan": result[6],
+            "is_demo": result[7],
+            "created_at": result[8].isoformat() if result[8] else None,
+            "status": result[9],
+            "vat_number": result[10],
+            "country": result[11],
+            "currency": result[12]
         }
         
-        print(f"✅ [Backend] Created company with integer ID: {row['id']} (returned as string: {company['id']})")
+        print(f"✅ [Backend] Created company with ID: {result[0]} (returned as string: {company['id']})")
         return company
         
     except Exception as e:
         print(f"❌ [Backend] Error creating company: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create company: {str(e)}")
+
+@app.put("/companies/{company_id}")
+async def update_company(
+    company_id: str,
+    company_data: dict
+):
+    """Update an existing company"""
+    
+    print(f"🏢 [Backend] Updating company {company_id}")
+    print(f"🏢 [Backend] Update data received: {company_data}")
+    
+    try:
+        # First check if company exists
+        check_query = """
+        SELECT id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency
+        FROM public.companies 
+        WHERE id = %s
+        """
+        existing_result = execute_query(check_query, (company_id,), fetch=True)
+        
+        if not existing_result or len(existing_result) == 0:
+            print(f"❌ [Backend] Company {company_id} not found")
+            raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+        
+        existing_company = dict(zip(['id', 'name', 'slug', 'owner_email', 'phone', 'address', 'subscription_plan', 'is_demo', 'created_at', 'status', 'vat_number', 'country', 'currency'], existing_result[0]))
+        
+        # Update the company in database
+        update_query = """
+        UPDATE public.companies 
+        SET name = %s, slug = %s, owner_email = %s, phone = %s, address = %s, 
+            subscription_plan = %s, is_demo = %s, status = %s, vat_number = %s, 
+            country = %s, currency = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+        RETURNING id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency, updated_at
+        """
+        
+        # Generate new slug if name changed
+        name = company_data.get('name', existing_company['name'])
+        slug = name.lower().replace(' ', '-').replace('&', 'and').replace('.', '').replace(',', '')
+        slug = ''.join(c for c in slug if c.isalnum() or c == '-')
+        
+        updated_company = execute_query(
+            update_query,
+            (
+                name,
+                slug,
+                company_data.get('owner_email', existing_company['owner_email']),
+                company_data.get('phone', existing_company['phone']),
+                company_data.get('address', existing_company['address']),
+                company_data.get('subscription_plan', existing_company['subscription_plan']),
+                company_data.get('is_demo', existing_company['is_demo']),
+                company_data.get('status', existing_company['status']),
+                company_data.get('vat_number', existing_company['vat_number']),
+                company_data.get('country', existing_company['country']),
+                company_data.get('currency', existing_company['currency']),
+                company_id
+            ),
+            fetch=True
+        )
+        
+        if updated_company:
+            # For UPDATE with RETURNING, execute_query returns a tuple 
+            # (id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency, updated_at)
+            result = {
+                "id": str(updated_company[0]),
+                "name": updated_company[1],
+                "slug": updated_company[2],
+                "owner_email": updated_company[3],
+                "phone": updated_company[4],
+                "address": updated_company[5],
+                "subscription_plan": updated_company[6],
+                "is_demo": updated_company[7],
+                "created_at": updated_company[8].isoformat() if updated_company[8] else None,
+                "status": updated_company[9],
+                "vat_number": updated_company[10],  # Get from database result
+                "country": updated_company[11],     # Get from database result
+                "currency": updated_company[12],    # Get from database result
+                "updated_at": updated_company[13].isoformat() if updated_company[13] else None
+            }
+            print(f"✅ [Backend] Company {company_id} updated successfully")
+            return result
+        else:
+            print(f"❌ [Backend] Failed to update company {company_id}")
+            raise HTTPException(status_code=500, detail="Failed to update company")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error updating company: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update company: {str(e)}")
+
+@app.get("/companies/{company_id}")
+async def get_company(company_id: str):
+    """Get a specific company by ID"""
+    try:
+        print(f"🔍 [Backend] Getting company with ID: {company_id}")
+        
+        query = """
+        SELECT id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency
+        FROM public.companies 
+        WHERE id = %s
+        """
+        
+        result = execute_query(query, (int(company_id),), fetch=True)
+        
+        if result and len(result) > 0:
+            row = result[0]
+            company = {
+                "id": str(row['id']),
+                "name": row['name'],
+                "slug": row['slug'],
+                "owner_email": row['owner_email'],
+                "phone": row['phone'],
+                "address": row['address'],
+                "subscription_plan": row['subscription_plan'],
+                "is_demo": row['is_demo'],
+                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                "status": row['status'],
+                "vat_number": row['vat_number'],
+                "country": row['country'],
+                "currency": row['currency']
+            }
+            
+            print(f"✅ [Backend] Company found: {company}")
+            return company
+        else:
+            raise HTTPException(status_code=404, detail="Company not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error getting company: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get company: {str(e)}")
+
+@app.delete("/companies/{company_id}")
+async def delete_company(company_id: str):
+    """Delete a company"""
+    try:
+        print(f"🗑️ [Backend] Deleting company with ID: {company_id}")
+        
+        # Check if company exists
+        check_query = """
+        SELECT id FROM public.companies WHERE id = %s
+        """
+        existing_company = execute_query(check_query, (int(company_id),), fetch=True)
+        
+        if not existing_company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        
+        # Delete company (this will cascade to related records if foreign keys are set up)
+        delete_query = """
+        DELETE FROM public.companies WHERE id = %s
+        """
+        
+        execute_query(delete_query, (int(company_id),))
+        
+        print(f"✅ [Backend] Company {company_id} deleted successfully")
+        return {"message": f"Company {company_id} deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error deleting company: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete company: {str(e)}")
+
+# ================== USER ENDPOINTS ==================
+
+@app.post("/users")
+async def create_user(user_data: dict):
+    """Create a new user"""
+    try:
+        print(f"🔤 [Backend] Creating user with data: {user_data}")
+        
+        # Validate required fields
+        if not user_data.get('firebase_uid'):
+            raise HTTPException(status_code=400, detail="firebase_uid is required")
+        
+        if not user_data.get('email'):
+            raise HTTPException(status_code=400, detail="email is required")
+        
+        # Check if user already exists
+        check_query = """
+        SELECT id FROM public.users WHERE firebase_uid = %s OR email = %s
+        """
+        existing_user = execute_query(check_query, (user_data['firebase_uid'], user_data['email']), fetch=True)
+        
+        if existing_user:
+            raise HTTPException(status_code=409, detail="User with this firebase_uid or email already exists")
+        
+        # Create user
+        user_query = """
+        INSERT INTO public.users (firebase_uid, email, created_at)
+        VALUES (%s, %s, CURRENT_TIMESTAMP)
+        RETURNING id, firebase_uid, email, created_at
+        """
+        
+        result = execute_query(
+            user_query, 
+            (user_data['firebase_uid'], user_data['email']), 
+            fetch=True
+        )
+        
+        if result:
+            user = {
+                "id": str(result[0]),
+                "firebase_uid": result[1],
+                "email": result[2],
+                "created_at": result[3].isoformat() if result[3] else None
+            }
+            
+            print(f"✅ [Backend] User created successfully: {user}")
+            return user
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error creating user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
+
+@app.get("/users")
+async def get_users():
+    """Get all users"""
+    try:
+        print("📋 [Backend] Getting all users")
+        
+        query = """
+        SELECT id, firebase_uid, email, created_at 
+        FROM public.users 
+        ORDER BY created_at DESC
+        """
+        
+        result = execute_query(query, fetch=True)
+        
+        if result:
+            users = []
+            for row in result:
+                user = {
+                    "id": str(row['id']),
+                    "firebase_uid": row['firebase_uid'],
+                    "email": row['email'],
+                    "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                }
+                users.append(user)
+            
+            print(f"✅ [Backend] Retrieved {len(users)} users")
+            return users
+        else:
+            print("📋 [Backend] No users found")
+            return []
+        
+    except Exception as e:
+        print(f"❌ [Backend] Error getting users: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get users: {str(e)}")
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: str):
+    """Get a specific user by ID"""
+    try:
+        print(f"🔍 [Backend] Getting user with ID: {user_id}")
+        
+        query = """
+        SELECT id, firebase_uid, email, created_at 
+        FROM public.users 
+        WHERE id = %s
+        """
+        
+        result = execute_query(query, (int(user_id),), fetch=True)
+        
+        if result and len(result) > 0:
+            row = result[0]
+            user = {
+                "id": str(row['id']),
+                "firebase_uid": row['firebase_uid'],
+                "email": row['email'],
+                "created_at": row['created_at'].isoformat() if row['created_at'] else None
+            }
+            
+            print(f"✅ [Backend] User found: {user}")
+            return user
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error getting user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user: {str(e)}")
+
+@app.put("/users/{user_id}")
+async def update_user(user_id: str, user_data: dict):
+    """Update a user"""
+    try:
+        print(f"🔄 [Backend] Updating user {user_id} with data: {user_data}")
+        
+        # Check if user exists
+        check_query = """
+        SELECT id, firebase_uid, email, created_at 
+        FROM public.users 
+        WHERE id = %s
+        """
+        existing_result = execute_query(check_query, (int(user_id),), fetch=True)
+        
+        if not existing_result:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        existing_user = {
+            'id': existing_result[0][0],
+            'firebase_uid': existing_result[0][1],
+            'email': existing_result[0][2],
+            'created_at': existing_result[0][3]
+        }
+        
+        # Update user
+        update_query = """
+        UPDATE public.users 
+        SET email = %s, firebase_uid = %s
+        WHERE id = %s
+        RETURNING id, firebase_uid, email, created_at
+        """
+        
+        updated_user = execute_query(
+            update_query,
+            (
+                user_data.get('email', existing_user['email']),
+                user_data.get('firebase_uid', existing_user['firebase_uid']),
+                int(user_id)
+            ),
+            fetch=True
+        )
+        
+        if updated_user:
+            result = {
+                "id": str(updated_user[0][0]),
+                "firebase_uid": updated_user[0][1],
+                "email": updated_user[0][2],
+                "created_at": updated_user[0][3].isoformat() if updated_user[0][3] else None
+            }
+            
+            print(f"✅ [Backend] User updated successfully: {result}")
+            return result
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update user")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error updating user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
+
+@app.delete("/users/{user_id}")
+async def delete_user(user_id: str):
+    """Delete a user"""
+    try:
+        print(f"🗑️ [Backend] Deleting user with ID: {user_id}")
+        
+        # Check if user exists
+        check_query = """
+        SELECT id FROM public.users WHERE id = %s
+        """
+        existing_user = execute_query(check_query, (int(user_id),), fetch=True)
+        
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Delete user
+        delete_query = """
+        DELETE FROM public.users WHERE id = %s
+        """
+        
+        execute_query(delete_query, (int(user_id),))
+        
+        print(f"✅ [Backend] User {user_id} deleted successfully")
+        return {"message": f"User {user_id} deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [Backend] Error deleting user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
 
 # ================== DATA ENDPOINTS ==================
 
@@ -652,24 +1059,43 @@ async def get_expense_categories():
 
 @app.get("/employees")
 async def get_employees(company_id: str = Query(..., description="Company ID")):
-    """Get list of employees for a company (from database + payroll data)"""
+    """Get list of employees for a company (from database employees + payroll data)"""
     
     print(f"👥 [Backend] Getting employees for company: {company_id}")
     
     try:
-        # Get employees from database
-        db_query = """
-        SELECT id, company_id, name, email, phone_number, position, 
-               department, base_salary, hire_date, is_active, 
-               created_at, updated_at
+        employees = []
+        
+        # Get employees from dedicated employees table
+        employees_query = """
+        SELECT id, company_id, name, email, phone_number, position, department, 
+               base_salary, hire_date, is_active, created_at, updated_at
         FROM public.employees 
-        WHERE company_id = %s::VARCHAR 
-        ORDER BY created_at DESC
+        WHERE company_id = %s
+        ORDER BY name
         """
         
-        db_result = execute_query(db_query, (company_id,), fetch=True)
+        employees_result = execute_query(employees_query, (company_id,), fetch=True)
         
-        # Get employees from payroll entries (existing functionality)
+        # Add employees from employees table
+        for row in employees_result or []:
+            employee = {
+                "id": str(row['id']),
+                "name": row['name'],
+                "company_id": company_id,
+                "email": row['email'],
+                "phone_number": row['phone_number'],
+                "position": row['position'],
+                "department": row['department'],
+                "base_salary": float(row['base_salary']) if row['base_salary'] else None,
+                "hire_date": row['hire_date'].isoformat() if row['hire_date'] else None,
+                "is_active": row['is_active'],
+                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                "source": "database"
+            }
+            employees.append(employee)
+        
+        # Get employees from payroll entries (for backward compatibility)
         payroll_query = """
         SELECT DISTINCT employee_name
         FROM public.payroll 
@@ -679,40 +1105,28 @@ async def get_employees(company_id: str = Query(..., description="Company ID")):
         
         payroll_result = execute_query(payroll_query, (company_id,), fetch=True)
         
-        employees = []
-        
-        # Add employees from database
-        for row in db_result or []:
-            employee = {
-                "id": str(row['id']),
-                "name": row['name'],
-                "company_id": row['company_id'],
-                "email": row['email'],
-                "phone_number": row['phone_number'],
-                "position": row['position'],
-                "department": row['department'],
-                "base_salary": float(row['base_salary']) if row['base_salary'] else None,
-                "hire_date": row['hire_date'].isoformat() if row['hire_date'] else None,
-                "is_active": row['is_active'],
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
-                "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None,
-                "source": "created"
-            }
-            employees.append(employee)
-        
-        # Add employees from payroll (avoid duplicates by checking names)
-        db_employee_names = {emp['name'].lower() for emp in employees}
+        # Add employees from payroll (only if not already in employees table)
+        existing_names = {emp['name'].lower() for emp in employees}
         for i, row in enumerate(payroll_result or [], 1):
-            if row['employee_name'].lower() not in db_employee_names:
+            employee_name = row['employee_name']
+            if employee_name.lower() not in existing_names:
                 employee = {
                     "id": f"payroll_{i}",  # Generate simple ID for payroll employees
-                    "name": row['employee_name'],
+                    "name": employee_name,
                     "company_id": company_id,
+                    "email": None,
+                    "phone_number": None,
+                    "position": None,
+                    "department": None,
+                    "base_salary": None,
+                    "hire_date": None,
+                    "is_active": True,
+                    "created_at": None,
                     "source": "payroll"
                 }
                 employees.append(employee)
         
-        print(f"👥 [Backend] Returning {len(employees)} employees (database: {len(db_result or [])}, payroll: {len(payroll_result or [])})")
+        print(f"👥 [Backend] Returning {len(employees)} employees (database: {len(employees_result or [])}, payroll: {len(payroll_result or [])})")
         return employees
         
     except Exception as e:
@@ -724,7 +1138,7 @@ async def create_employee(
     employee_data: dict,
     company_id: str = Query(..., description="Company ID")
 ):
-    """Create a new employee"""
+    """Create a new employee in database"""
     
     print(f"👥 [Backend] Creating employee for company: {company_id}")
     print(f"👥 [Backend] Employee data received: {employee_data}")
@@ -743,59 +1157,68 @@ async def create_employee(
         if not name:
             raise HTTPException(status_code=400, detail="Employee name is required")
         
-        print(f"👥 [Backend] Saving employee to database...")
+        # First ensure the employees table exists
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS public.employees (
+            id SERIAL PRIMARY KEY,
+            company_id VARCHAR(36) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255),
+            phone_number VARCHAR(20),
+            position VARCHAR(100),
+            department VARCHAR(100),
+            base_salary NUMERIC(10,2),
+            hire_date DATE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        execute_query(create_table_query, (), fetch=False)
         
-        # Insert into database
+        # Insert employee into database
         insert_query = """
         INSERT INTO public.employees (
-            company_id, name, email, phone_number, position, 
-            department, base_salary, hire_date, is_active, 
-            created_at, updated_at
-        ) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-        RETURNING id, created_at, updated_at
+            company_id, name, email, phone_number, position, department, 
+            base_salary, hire_date, is_active
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id, created_at
         """
         
-        result = execute_query(
-            insert_query, 
-            (company_id, name, email, phone_number, position, department, base_salary, hire_date, is_active),
-            fetch=True
-        )
+        result = execute_query(insert_query, (
+            company_id, name, email, phone_number, position, department,
+            base_salary, hire_date, is_active
+        ), fetch=True)
         
-        if not result:
-            raise HTTPException(status_code=500, detail="Failed to create employee")
-        
-        # Handle tuple result from INSERT with RETURNING
-        if isinstance(result, tuple):
+        if result:
+            # For INSERT with RETURNING, execute_query returns a tuple (id, created_at)
             employee_id = result[0]
             created_at = result[1]
-            updated_at = result[2]
+            
+            print(f"✅ [Backend] Employee created with ID: {employee_id}")
+            
+            # Return employee data in expected format
+            employee = {
+                "id": str(employee_id),
+                "company_id": company_id,
+                "name": name,
+                "email": email,
+                "phone_number": phone_number,
+                "position": position,
+                "department": department,
+                "base_salary": float(base_salary) if base_salary else None,
+                "hire_date": hire_date,
+                "is_active": is_active,
+                "created_at": created_at.isoformat() if created_at else None,
+                "source": "database"
+            }
+            
+            return employee
         else:
-            # Fallback for unexpected result format
-            employee_id = result
-            created_at = None
-            updated_at = None
-        
-        # Return employee data in expected format
-        employee = {
-            "id": str(employee_id),
-            "company_id": company_id,
-            "name": name,
-            "email": email,
-            "phone_number": phone_number,
-            "position": position,
-            "department": department,
-            "base_salary": float(base_salary) if base_salary else None,
-            "hire_date": hire_date,
-            "is_active": is_active,
-            "created_at": created_at.isoformat() if created_at else None,
-            "updated_at": updated_at.isoformat() if updated_at else None,
-            "source": "created"
-        }
-        
-        print(f"✅ [Backend] Employee {name} created in database with ID: {employee_id}")
-        return employee
-        
+            raise HTTPException(status_code=500, detail="Failed to create employee")
+            
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ [Backend] Error creating employee: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create employee: {str(e)}")
@@ -812,87 +1235,74 @@ async def update_employee(
     print(f"👥 [Backend] Update data received: {employee_data}")
     
     try:
-        # Check if this is a payroll-extracted employee (has 'payroll_' prefix)
+        # Check if this is a payroll-derived employee (starts with 'payroll_')
         if employee_id.startswith('payroll_'):
-            print(f"❌ [Backend] Cannot update payroll-extracted employee {employee_id}")
-            print(f"❌ [Backend] Payroll-extracted employees are read-only")
+            print(f"👥 [Backend] Employee {employee_id} is from payroll - payroll employees are read-only")
             raise HTTPException(
                 status_code=400, 
-                detail="Cannot update payroll-extracted employees. These are read-only records generated from payroll data."
+                detail="Payroll-derived employees cannot be updated. Create a new employee record instead."
             )
         
-        # Update in database
+        # First check if employee exists in database
+        check_query = """
+        SELECT id, name, email, phone_number, position, department, base_salary, hire_date, is_active 
+        FROM employees 
+        WHERE id = %s AND company_id = %s
+        """
+        existing_result = execute_query(check_query, (employee_id, company_id), fetch=True)
+        
+        if not existing_result or len(existing_result) == 0:
+            print(f"❌ [Backend] Employee {employee_id} not found for company {company_id}")
+            raise HTTPException(status_code=404, detail=f"Employee {employee_id} not found")
+        
+        existing_employee = existing_result[0]  # Get the first (and only) row
+        
+        # Update the employee in database
         update_query = """
-        UPDATE public.employees 
-        SET name = %s, email = %s, phone_number = %s, position = %s,
-            department = %s, base_salary = %s, hire_date = %s, 
-            is_active = %s, updated_at = NOW()
-        WHERE id = %s::INTEGER AND company_id = %s::VARCHAR
-        RETURNING id, company_id, name, email, phone_number, position, 
-                  department, base_salary, hire_date, is_active, 
-                  created_at, updated_at
+        UPDATE employees 
+        SET name = %s, email = %s, phone_number = %s, position = %s, 
+            department = %s, base_salary = %s, hire_date = %s, is_active = %s, 
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s AND company_id = %s
+        RETURNING id, name, email, phone_number, position, department, base_salary, hire_date, is_active
         """
         
-        result = execute_query(
+        updated_employee = execute_query(
             update_query,
             (
-                employee_data.get('name'),
-                employee_data.get('email'),
-                employee_data.get('phone_number'),
-                employee_data.get('position'),
-                employee_data.get('department'),
-                employee_data.get('base_salary'),
-                employee_data.get('hire_date'),
-                employee_data.get('is_active', True),
+                employee_data.get('name', existing_employee['name']),
+                employee_data.get('email', existing_employee['email']),
+                employee_data.get('phone_number', existing_employee['phone_number']),
+                employee_data.get('position', existing_employee['position']),
+                employee_data.get('department', existing_employee['department']),
+                employee_data.get('base_salary', existing_employee['base_salary']),
+                employee_data.get('hire_date', existing_employee['hire_date']),
+                employee_data.get('is_active', existing_employee['is_active']),
                 employee_id,
                 company_id
             ),
             fetch=True
         )
         
-        if not result:
-            print(f"❌ [Backend] Employee {employee_id} not found for company {company_id}")
-            raise HTTPException(status_code=404, detail=f"Employee {employee_id} not found")
-        
-        # Handle tuple result from UPDATE with RETURNING
-        if isinstance(result, tuple):
-            # result is a tuple: (id, company_id, name, email, phone_number, position, department, base_salary, hire_date, is_active, created_at, updated_at)
-            employee = {
-                "id": str(result[0]),
-                "company_id": str(result[1]),
-                "name": result[2],
-                "email": result[3],
-                "phone_number": result[4],
-                "position": result[5],
-                "department": result[6],
-                "base_salary": float(result[7]) if result[7] else None,
-                "hire_date": result[8].isoformat() if result[8] else None,
-                "is_active": result[9],
-                "created_at": result[10].isoformat() if result[10] else None,
-                "updated_at": result[11].isoformat() if result[11] else None,
-                "source": "created"
+        if updated_employee:
+            # For UPDATE with RETURNING, execute_query returns a tuple 
+            result = {
+                "id": str(updated_employee[0]),
+                "name": updated_employee[1],
+                "email": updated_employee[2],
+                "phone_number": updated_employee[3],
+                "position": updated_employee[4],
+                "department": updated_employee[5],
+                "base_salary": float(updated_employee[6]) if updated_employee[6] else None,
+                "hire_date": str(updated_employee[7]) if updated_employee[7] else None,
+                "is_active": updated_employee[8],
+                "source": "database"
             }
+            print(f"✅ [Backend] Employee {employee_id} updated successfully")
+            return result
         else:
-            # Fallback for unexpected result format
-            row = result[0] if isinstance(result, list) else result
-            employee = {
-                "id": str(row['id']),
-                "company_id": row['company_id'],
-                "name": row['name'],
-                "email": row['email'],
-                "phone_number": row['phone_number'],
-                "position": row['position'],
-                "department": row['department'],
-                "base_salary": float(row['base_salary']) if row['base_salary'] else None,
-                "hire_date": row['hire_date'].isoformat() if row['hire_date'] else None,
-                "is_active": row['is_active'],
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
-                "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None,
-                "source": "created"
-            }
-        
-        print(f"✅ [Backend] Employee {employee_id} updated successfully in database")
-        return employee
+            print(f"❌ [Backend] Failed to update employee {employee_id}")
+            raise HTTPException(status_code=500, detail="Failed to update employee")
         
     except HTTPException:
         raise
@@ -905,48 +1315,44 @@ async def delete_employee(
     employee_id: str,
     company_id: str = Query(..., description="Company ID")
 ):
-    """Delete an existing employee"""
+    """Delete an employee from database"""
     
     print(f"👥 [Backend] Deleting employee {employee_id} for company: {company_id}")
     
     try:
-        # Check if this is a payroll-extracted employee (has 'payroll_' prefix)
+        # Check if this is a payroll-derived employee (starts with 'payroll_')
         if employee_id.startswith('payroll_'):
-            print(f"❌ [Backend] Cannot delete payroll-extracted employee {employee_id}")
-            print(f"❌ [Backend] Payroll-extracted employees are read-only")
+            print(f"👥 [Backend] Employee {employee_id} is from payroll - payroll employees cannot be deleted")
             raise HTTPException(
                 status_code=400, 
-                detail="Cannot delete payroll-extracted employees. These are read-only records generated from payroll data."
+                detail="Payroll-derived employees cannot be deleted. They are read-only records."
             )
         
-        # Delete from database
-        delete_query = """
-        DELETE FROM public.employees 
-        WHERE id = %s::INTEGER AND company_id = %s::VARCHAR
-        RETURNING id, name
+        # First check if employee exists in database
+        check_query = """
+        SELECT id FROM employees 
+        WHERE id = %s AND company_id = %s
         """
+        existing_employee = execute_query(check_query, (employee_id, company_id), fetch=True)
         
-        result = execute_query(
-            delete_query,
-            (employee_id, company_id),
-            fetch=True
-        )
-        
-        if not result:
+        if not existing_employee or len(existing_employee) == 0:
             print(f"❌ [Backend] Employee {employee_id} not found for company {company_id}")
             raise HTTPException(status_code=404, detail=f"Employee {employee_id} not found")
         
-        # Handle tuple result from DELETE with RETURNING
-        if isinstance(result, tuple):
-            deleted_id = result[0]
-            deleted_name = result[1]
-        else:
-            # Fallback for unexpected result format
-            deleted_id = employee_id
-            deleted_name = "Unknown"
+        # Delete the employee from database
+        delete_query = """
+        DELETE FROM employees 
+        WHERE id = %s AND company_id = %s
+        """
         
-        print(f"✅ [Backend] Employee {deleted_name} (ID: {deleted_id}) deleted successfully from database")
-        return {"message": f"Employee {deleted_name} deleted successfully", "id": str(deleted_id)}
+        result = execute_query(delete_query, (employee_id, company_id), fetch=False)
+        
+        if result > 0:
+            print(f"✅ [Backend] Employee {employee_id} deleted successfully")
+            return {"message": f"Employee {employee_id} deleted successfully"}
+        else:
+            print(f"❌ [Backend] Failed to delete employee {employee_id}")
+            raise HTTPException(status_code=500, detail="Failed to delete employee")
         
     except HTTPException:
         raise

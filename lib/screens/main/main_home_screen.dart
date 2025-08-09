@@ -6,6 +6,7 @@ import '../../pages/home_page.dart';
 import '../features/invoices_screen.dart';
 import '../features/expenses_screen.dart';
 import '../../dialogs/manage_employees_dialog.dart';
+import '../admin/admin_screen.dart';
 
 class MainHomeScreen extends StatefulWidget {
   const MainHomeScreen({super.key});
@@ -59,9 +60,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 
   void _handleAdmin() {
-    showDialog(
-      context: context,
-      builder: (context) => const ManageEmployeesDialog(),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AdminScreen()),
     );
   }
 

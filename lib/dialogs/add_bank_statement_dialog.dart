@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class AddBankStatementDialog extends StatefulWidget {
   const AddBankStatementDialog({super.key});
@@ -47,6 +48,14 @@ class _AddBankStatementDialogState extends State<AddBankStatementDialog> {
     } else {
       debugPrint('🏦 AddBankStatementDialog: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   @override
@@ -299,7 +308,7 @@ class _AddBankStatementDialogState extends State<AddBankStatementDialog> {
                               },
                               decoration: InputDecoration(
                                 hintText: '0.00',
-                                prefixText: '\$ ',
+                                prefixText: '${_getCurrencySymbol()} ',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),

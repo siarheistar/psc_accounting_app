@@ -8,6 +8,7 @@ import '../models/accounting_models.dart';
 import '../context/simple_company_context.dart';
 import '../dialogs/add_expense_dialog.dart';
 import '../dialogs/edit_expense_dialog.dart';
+import '../utils/currency_utils.dart';
 
 class ExpensesPage extends StatefulWidget {
   const ExpensesPage({super.key});
@@ -45,6 +46,11 @@ class _ExpensesPageState extends State<ExpensesPage> {
     } else {
       debugPrint('💰 ExpensesPage: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    return CurrencyUtils.getCurrencySymbol(selectedCompany?.currency);
   }
 
   @override
@@ -789,7 +795,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '\$${expense.amount.toStringAsFixed(2)}',
+                    '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

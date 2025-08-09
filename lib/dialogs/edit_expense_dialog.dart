@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class EditExpenseDialog extends StatefulWidget {
   final Expense expense;
@@ -129,6 +130,14 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
 
     print(
         '🔍 [DEBUG] === END COMPANY CONTEXT INITIALIZATION (EDIT EXPENSE) ===');
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   Future<void> _updateExpense() async {
@@ -337,10 +346,10 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _amountController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Amount',
-                    border: OutlineInputBorder(),
-                    prefixText: '\$',
+                    border: const OutlineInputBorder(),
+                    prefixText: _getCurrencySymbol(),
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [

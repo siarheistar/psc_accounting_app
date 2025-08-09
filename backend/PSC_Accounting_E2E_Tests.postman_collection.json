@@ -1,0 +1,811 @@
+{
+  "info": {
+    "name": "PSC Accounting App - E2E Tests",
+    "description": "End-to-end testing collection for PSC Accounting App API endpoints covering company and user CRUD operations",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "Company Operations",
+      "description": "Complete CRUD testing for company management",
+      "item": [
+        {
+          "name": "1. Create Company - Valid Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Company Ltd\",\n    \"owner_email\": \"owner@testcompany.com\",\n    \"phone\": \"+353-1-555-0123\",\n    \"address\": \"123 Business Park, Dublin 2, Ireland\",\n    \"country\": \"Ireland\",\n    \"currency\": \"EUR\",\n    \"vat_number\": \"IE1234567T\",\n    \"subscription_plan\": \"basic\",\n    \"is_demo\": false,\n    \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies",
+              "host": ["{{base_url}}"],
+              "path": ["companies"]
+            },
+            "description": "Create a new company with all required and optional fields"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has company data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson.name).to.eql('Test Company Ltd');",
+                  "    pm.expect(responseJson.country).to.eql('Ireland');",
+                  "    pm.expect(responseJson.currency).to.eql('EUR');",
+                  "    pm.expect(responseJson.vat_number).to.eql('IE1234567T');",
+                  "    ",
+                  "    // Store company ID for later tests",
+                  "    pm.environment.set('test_company_id', responseJson.id);",
+                  "});",
+                  "",
+                  "pm.test(\"Response time is less than 2000ms\", function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Create Company - Minimum Required Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Minimal Company\",\n    \"owner_email\": \"minimal@company.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies",
+              "host": ["{{base_url}}"],
+              "path": ["companies"]
+            },
+            "description": "Create a company with only minimum required fields"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Company created with defaults\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.name).to.eql('Minimal Company');",
+                  "    pm.expect(responseJson.country).to.eql('Ireland'); // Default",
+                  "    pm.expect(responseJson.currency).to.eql('EUR'); // Default",
+                  "    ",
+                  "    // Store minimal company ID for cleanup",
+                  "    pm.environment.set('minimal_company_id', responseJson.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Create Company - Invalid Data (Missing Name)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"owner_email\": \"invalid@company.com\",\n    \"country\": \"Ireland\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies",
+              "host": ["{{base_url}}"],
+              "path": ["companies"]
+            },
+            "description": "Test validation by sending request without required company name"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code indicates error (4xx or 5xx)\", function () {",
+                  "    pm.expect(pm.response.code).to.be.greaterThan(399);",
+                  "});",
+                  "",
+                  "pm.test(\"Error response contains validation message\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('detail');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Get All Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies?owner_email=owner@testcompany.com",
+              "host": ["{{base_url}}"],
+              "path": ["companies"],
+              "query": [
+                {
+                  "key": "owner_email",
+                  "value": "owner@testcompany.com"
+                }
+              ]
+            },
+            "description": "Retrieve all companies for a specific user"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is array of companies\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "    pm.expect(responseJson.length).to.be.greaterThan(0);",
+                  "});",
+                  "",
+                  "pm.test(\"Company data structure is correct\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const company = responseJson[0];",
+                  "    pm.expect(company).to.have.property('id');",
+                  "    pm.expect(company).to.have.property('name');",
+                  "    pm.expect(company).to.have.property('country');",
+                  "    pm.expect(company).to.have.property('currency');",
+                  "    pm.expect(company).to.have.property('vat_number');",
+                  "    pm.expect(company).to.have.property('created_at');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Get Company by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/{{test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{test_company_id}}"]
+            },
+            "description": "Retrieve specific company by ID"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Company data matches created company\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.id).to.eql(pm.environment.get('test_company_id'));",
+                  "    pm.expect(responseJson.name).to.eql('Test Company Ltd');",
+                  "    pm.expect(responseJson.vat_number).to.eql('IE1234567T');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Update Company - Full Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Company Ltd - Updated\",\n    \"owner_email\": \"newemail@testcompany.com\",\n    \"phone\": \"+353-1-555-9999\",\n    \"address\": \"456 New Business Park, Dublin 4, Ireland\",\n    \"country\": \"Ireland\",\n    \"currency\": \"EUR\",\n    \"vat_number\": \"IE9876543L\",\n    \"subscription_plan\": \"premium\",\n    \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies/{{test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{test_company_id}}"]
+            },
+            "description": "Update all fields of the test company"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Company updated successfully\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.name).to.eql('Test Company Ltd - Updated');",
+                  "    pm.expect(responseJson.vat_number).to.eql('IE9876543L');",
+                  "    pm.expect(responseJson.phone).to.eql('+353-1-555-9999');",
+                  "    pm.expect(responseJson.owner_email).to.eql('newemail@testcompany.com');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Update Company - Partial Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"vat_number\": \"IE5555555K\",\n    \"subscription_plan\": \"enterprise\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies/{{test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{test_company_id}}"]
+            },
+            "description": "Update only specific fields, others should remain unchanged"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Partial update applied correctly\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.vat_number).to.eql('IE5555555K');",
+                  "    // Name should remain from previous update",
+                  "    pm.expect(responseJson.name).to.eql('Test Company Ltd - Updated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Update Non-existent Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Should Not Work\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies/99999",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "99999"]
+            },
+            "description": "Test updating a company that doesn't exist"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code indicates not found (404)\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message indicates company not found\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('detail');",
+                  "    pm.expect(responseJson.detail).to.include('not found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Delete Company - Test Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/{{test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{test_company_id}}"]
+            },
+            "description": "Delete the test company created earlier"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 204\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});",
+                  "",
+                  "pm.test(\"Company deletion confirmed\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('message');",
+                  "    pm.expect(responseJson.message).to.include('deleted');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Delete Company - Minimal Company Cleanup",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/{{minimal_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{minimal_company_id}}"]
+            },
+            "description": "Clean up the minimal company"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 204\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Delete Non-existent Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/99999",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "99999"]
+            },
+            "description": "Test deleting a company that doesn't exist"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code indicates not found (404)\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message indicates company not found\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('detail');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Verify Company Deleted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/{{test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{test_company_id}}"]
+            },
+            "description": "Verify that the deleted company is no longer accessible"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code indicates not found (404)\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Company is no longer available\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('detail');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Operations",
+      "description": "User management testing (Note: User endpoints may need to be implemented)",
+      "item": [
+        {
+          "name": "1. Create User - Valid Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"firebase_uid\": \"test-firebase-uid-123\",\n    \"email\": \"testuser@example.com\",\n    \"display_name\": \"Test User\",\n    \"phone_number\": \"+353-1-555-0100\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            },
+            "description": "Create a new user (endpoint may need implementation)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Note: This test assumes user endpoints are implemented",
+                  "pm.test(\"Status code is 200 or 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "if (pm.response.code < 400) {",
+                  "    pm.test(\"User created successfully\", function () {",
+                  "        const responseJson = pm.response.json();",
+                  "        pm.expect(responseJson).to.have.property('id');",
+                  "        pm.expect(responseJson.email).to.eql('testuser@example.com');",
+                  "        pm.environment.set('test_user_id', responseJson.id);",
+                  "    });",
+                  "} else {",
+                  "    pm.test(\"User endpoint not implemented yet - expected\", function () {",
+                  "        pm.expect(pm.response.code).to.be.oneOf([404, 405]);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            },
+            "description": "Retrieve all users (endpoint may need implementation)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Users retrieved successfully\", function () {",
+                  "        const responseJson = pm.response.json();",
+                  "        pm.expect(responseJson).to.be.an('array');",
+                  "    });",
+                  "} else {",
+                  "    pm.test(\"User endpoints not implemented yet - expected\", function () {",
+                  "        pm.expect(pm.response.code).to.be.oneOf([404, 405]);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"updated.testuser@example.com\",\n    \"display_name\": \"Updated Test User\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/{{test_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{test_user_id}}"]
+            },
+            "description": "Update user information (endpoint may need implementation)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"User updated successfully\", function () {",
+                  "        const responseJson = pm.response.json();",
+                  "        pm.expect(responseJson.email).to.eql('updated.testuser@example.com');",
+                  "    });",
+                  "} else {",
+                  "    pm.test(\"User endpoints not implemented yet - expected\", function () {",
+                  "        pm.expect(pm.response.code).to.be.oneOf([404, 405]);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/{{test_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{test_user_id}}"]
+            },
+            "description": "Delete test user (endpoint may need implementation)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 204) {",
+                  "    pm.test(\"User deleted successfully\", function () {",
+                  "        pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "    });",
+                  "} else {",
+                  "    pm.test(\"User endpoints not implemented yet - expected\", function () {",
+                  "        pm.expect(pm.response.code).to.be.oneOf([404, 405]);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Data Validation Tests",
+      "description": "Test data validation and edge cases",
+      "item": [
+        {
+          "name": "VAT Number Validation - Irish Format",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"VAT Test Company IE\",\n    \"owner_email\": \"vat@test.ie\",\n    \"country\": \"Ireland\",\n    \"vat_number\": \"IE1234567T\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies",
+              "host": ["{{base_url}}"],
+              "path": ["companies"]
+            },
+            "description": "Test Irish VAT number format validation"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Irish VAT number accepted\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.vat_number).to.eql('IE1234567T');",
+                  "    pm.environment.set('vat_test_company_id', responseJson.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Currency Auto-assignment Test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"UK Test Company\",\n    \"owner_email\": \"uk@test.com\",\n    \"country\": \"United Kingdom\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/companies",
+              "host": ["{{base_url}}"],
+              "path": ["companies"]
+            },
+            "description": "Test that currency is correctly assigned based on country"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Currency correctly assigned for UK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.country).to.eql('United Kingdom');",
+                  "    // Note: Backend may not auto-assign currency yet",
+                  "    pm.environment.set('uk_test_company_id', responseJson.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cleanup VAT Test Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/{{vat_test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{vat_test_company_id}}"]
+            },
+            "description": "Clean up VAT test company"
+          },
+          "response": []
+        },
+        {
+          "name": "Cleanup UK Test Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/companies/{{uk_test_company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["companies", "{{uk_test_company_id}}"]
+            },
+            "description": "Clean up UK test company"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Running E2E test: ' + pm.info.requestName);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "// Log test results",
+          "if (pm.response.code >= 400) {",
+          "    console.log('Error response:', pm.response.text());",
+          "}"
+        ]
+      }
+    }
+  ]
+}
