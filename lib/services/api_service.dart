@@ -177,13 +177,29 @@ class ApiService {
   static Future<Map<String, dynamic>> createCompany(
       Map<String, dynamic> company) async {
     print('🏢 [ApiService] Creating company with data: $company');
-    print('🌐 [ApiService] Sending POST request to: $baseUrl/companies');
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/companies'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(company),
-    );
+    // Build query parameters as the backend expects them
+    final queryParams = <String, String>{
+      'name': company['name']?.toString() ?? '',
+      'owner_email': company['owner_email']?.toString() ?? '',
+    };
+
+    // Add optional parameters if they exist
+    if (company['vat_number'] != null) {
+      queryParams['vat_number'] = company['vat_number'].toString();
+    }
+    if (company['country'] != null) {
+      queryParams['country'] = company['country'].toString();
+    }
+    if (company['currency'] != null) {
+      queryParams['currency'] = company['currency'].toString();
+    }
+
+    final uri =
+        Uri.parse('$baseUrl/companies').replace(queryParameters: queryParams);
+    print('🌐 [ApiService] Sending POST request to: $uri');
+
+    final response = await http.post(uri);
 
     print('📡 [ApiService] Response status: ${response.statusCode}');
     print('📋 [ApiService] Response body: ${response.body}');

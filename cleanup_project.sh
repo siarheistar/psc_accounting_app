@@ -10,8 +10,41 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+DRY_RUN=false
+FORCE_YES=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --yes|-y)
+            FORCE_YES=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Options:"
+            echo "  --dry-run    Show what would be deleted without actually deleting"
+            echo "  --yes, -y    Answer yes to all prompts (use with caution)"
+            echo "  --help, -h   Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${BLUE}🧹 PSC Accounting App - Project Cleanup Script${NC}"
 echo -e "${BLUE}================================================${NC}"
+if [ "$DRY_RUN" = "true" ]; then
+    echo -e "${YELLOW}🔍 DRY RUN MODE - No files will be deleted${NC}"
+fi
 echo ""
 
 # Function to log actions
@@ -33,13 +66,18 @@ safe_remove() {
     local description="$2"
     
     if [ -e "$path" ]; then
-        echo -e "${YELLOW}Removing: $description${NC}"
-        echo "  Path: $path"
-        rm -rf "$path"
-        if [ $? -eq 0 ]; then
-            log_action "Removed: $description"
+        if [ "$DRY_RUN" = "true" ]; then
+            echo -e "${YELLOW}[DRY RUN] Would remove: $description${NC}"
+            echo "  Path: $path"
         else
-            log_error "Failed to remove: $description"
+            echo -e "${YELLOW}Removing: $description${NC}"
+            echo "  Path: $path"
+            rm -rf "$path"
+            if [ $? -eq 0 ]; then
+                log_action "Removed: $description"
+            else
+                log_error "Failed to remove: $description"
+            fi
         fi
     else
         echo -e "${BLUE}Not found (already clean): $description${NC}"
@@ -94,9 +132,20 @@ safe_remove "lib/widgets/database_connection_test.dart" "Database connection tes
 echo -e "\n${BLUE}5. Cleaning development environment files...${NC}"
 log_warning "Python venv/ directory is PRESERVED - it's required for backend dependencies"
 
-read -p "Remove Node.js modules? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+# Helper function for prompts
+prompt_user() {
+    local message="$1"
+    if [ "$FORCE_YES" = "true" ]; then
+        echo "$message y"
+        return 0
+    else
+        read -p "$message" -n 1 -r
+        echo
+        [[ $REPLY =~ ^[Yy]$ ]]
+    fi
+}
+
+if prompt_user "Remove Node.js modules? (y/N): "; then
     safe_remove "node_modules/" "Node.js modules"
     log_warning "You can recreate with: npm install"
 fi
@@ -110,31 +159,33 @@ fi
 
 # 7. Remove IDE-specific files (optional)
 echo -e "\n${BLUE}7. IDE-specific files cleanup...${NC}"
-read -p "Remove IntelliJ IDEA files (.idea/, *.iml)? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+if prompt_user "Remove IntelliJ IDEA files (.idea/, *.iml)? (y/N): "; then
     safe_remove ".idea/" "IntelliJ IDEA directory"
     safe_remove "psc_accounting_app.iml" "IntelliJ IDEA module file"
     safe_remove "android/psc_accounting_app_android.iml" "Android IntelliJ IDEA module file"
 fi
 
-# 8. Clean up obsolete Node.js/backend JS files (if using Python backend)
-echo -e "\n${BLUE}8. Checking for obsolete Node.js backend files...${NC}"
-if [ -d "backend/routes" ] && [ -f "backend/main.py" ]; then
-    log_warning "Found both Python backend (main.py) and Node.js routes - consider cleanup"
-    read -p "Remove Node.js backend files (routes/, services/, middleware/)? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        safe_remove "backend/routes/" "Node.js routes directory"
-        safe_remove "backend/services/" "Node.js services directory (keeping Python files)"
-        safe_remove "backend/middleware/" "Node.js middleware directory"
-        safe_remove "package.json" "Node.js package.json"
-        safe_remove "package-lock.json" "Node.js package-lock.json"
-    fi
+# 8. Handle migration files (with caution)
+echo -e "\n${BLUE}8. Checking migration files...${NC}"
+log_warning "Migration files found - only remove if migrations are completed successfully"
+if prompt_user "Remove migration files (migrations appear to be completed)? (y/N): "; then
+    safe_remove "backend/migration_attachments.sql" "Migration attachments SQL file"
+    safe_remove "backend/migration_attachments_simple.sql" "Simple migration attachments SQL file"
+    safe_remove "backend/migration_file_storage.sql" "Migration file storage SQL file"
+    safe_remove "backend/migrate_attachments.py" "Migration attachments Python script"
+    safe_remove "backend/migration_summary.py" "Migration summary Python script"
+    safe_remove "backend/setup_attachments.sh" "Setup attachments script"
 fi
 
-# 9. Clean up upload directories (CAREFULLY - preserve active attachments)
-echo -e "\n${BLUE}9. Checking upload directories...${NC}"
+# 9. Add dry-run mode option
+echo -e "\n${BLUE}9. Adding documentation cleanup...${NC}"
+if prompt_user "Remove temporary documentation files? (y/N): "; then
+    safe_remove "CLEANUP_README.md" "Temporary cleanup documentation"
+    safe_remove "analyze_project.sh" "Project analysis script"
+fi
+
+# 10. Clean up upload directories (CAREFULLY - preserve active attachments)
+echo -e "\n${BLUE}10. Checking upload directories...${NC}"
 log_warning "backend/uploads/ is COMPLETELY PRESERVED - including empty folders (part of required architecture)"
 
 if [ -d "backend/uploads/" ]; then
@@ -142,17 +193,6 @@ if [ -d "backend/uploads/" ]; then
 else
     echo "  No backend/uploads/ directory found"
 fi
-
-# Check for other potential upload directories
-for dir in "uploads/" "files/" "attachments/" "temp_uploads/"; do
-    if [ -d "$dir" ] && [ "$dir" != "backend/uploads/" ]; then
-        read -p "Remove '$dir' directory? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            safe_remove "$dir" "upload directory"
-        fi
-    fi
-done
 
 # 10. Remove OS-specific files
 echo -e "\n${BLUE}10. Removing OS-specific files...${NC}"

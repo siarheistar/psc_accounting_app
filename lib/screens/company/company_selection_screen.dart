@@ -59,110 +59,176 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
 
   Future<void> _showCreateCompanyDialog() async {
     final TextEditingController nameController = TextEditingController();
-    final TextEditingController addressController = TextEditingController();
-    final TextEditingController phoneController = TextEditingController();
-    final TextEditingController emailController = TextEditingController();
+    final TextEditingController vatController = TextEditingController();
+    String selectedCountry = 'Ireland';
+    String selectedCurrency = 'EUR';
 
     final result = await showDialog<Company>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Create New Company'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Company Name',
-                    border: OutlineInputBorder(),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Create New Company'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Company Name *',
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter your company name',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: vatController,
+                      decoration: const InputDecoration(
+                        labelText: 'VAT Number',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g., IE1234567T (optional)',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedCountry,
+                      decoration: const InputDecoration(
+                        labelText: 'Country',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'Ireland', child: Text('Ireland')),
+                        DropdownMenuItem(
+                            value: 'United Kingdom',
+                            child: Text('United Kingdom')),
+                        DropdownMenuItem(
+                            value: 'United States',
+                            child: Text('United States')),
+                        DropdownMenuItem(
+                            value: 'Germany', child: Text('Germany')),
+                        DropdownMenuItem(
+                            value: 'France', child: Text('France')),
+                        DropdownMenuItem(
+                            value: 'Netherlands', child: Text('Netherlands')),
+                        DropdownMenuItem(
+                            value: 'Belgium', child: Text('Belgium')),
+                        DropdownMenuItem(value: 'Other', child: Text('Other')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedCountry = value!;
+                          // Auto-update currency based on country
+                          switch (value) {
+                            case 'Ireland':
+                            case 'Germany':
+                            case 'France':
+                            case 'Netherlands':
+                            case 'Belgium':
+                              selectedCurrency = 'EUR';
+                              break;
+                            case 'United Kingdom':
+                              selectedCurrency = 'GBP';
+                              break;
+                            case 'United States':
+                              selectedCurrency = 'USD';
+                              break;
+                            default:
+                              selectedCurrency = 'EUR';
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedCurrency,
+                      decoration: const InputDecoration(
+                        labelText: 'Currency',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'EUR', child: Text('EUR (€)')),
+                        DropdownMenuItem(value: 'USD', child: Text('USD (\$)')),
+                        DropdownMenuItem(value: 'GBP', child: Text('GBP (£)')),
+                        DropdownMenuItem(value: 'CHF', child: Text('CHF')),
+                        DropdownMenuItem(value: 'CAD', child: Text('CAD')),
+                        DropdownMenuItem(value: 'AUD', child: Text('AUD')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedCurrency = value!;
+                        });
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Company name is required')),
+                      );
+                      return;
+                    }
+
+                    try {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user != null) {
+                        print(
+                            '🏢 [CompanySelection] Creating company for user: ${user.email}');
+
+                        final companyData = {
+                          'name': nameController.text.trim(),
+                          'owner_email': user.email!,
+                          'country': selectedCountry,
+                          'currency': selectedCurrency,
+                        };
+
+                        // Add VAT number if provided
+                        if (vatController.text.trim().isNotEmpty) {
+                          companyData['vat_number'] = vatController.text.trim();
+                        }
+
+                        print(
+                            '📋 [CompanySelection] Company data prepared: $companyData');
+
+                        final newCompanyData =
+                            await ApiService.createCompany(companyData);
+
+                        print(
+                            '✅ [CompanySelection] Company created, received data: $newCompanyData');
+
+                        final newCompany = Company.fromJson(newCompanyData);
+
+                        print(
+                            '🎉 [CompanySelection] Company object created: ${newCompany.toString()}');
+
+                        Navigator.of(context).pop(newCompany);
+                      } else {
+                        print(
+                            '❌ [CompanySelection] No authenticated user found');
+                      }
+                    } catch (e) {
+                      print('💥 [CompanySelection] Error creating company: $e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to create company: $e')),
+                      );
+                    }
+                  },
+                  child: const Text('Create'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Company name is required')),
-                  );
-                  return;
-                }
-
-                try {
-                  final user = FirebaseAuth.instance.currentUser;
-                  if (user != null) {
-                    print(
-                        '🏢 [CompanySelection] Creating company for user: ${user.email}');
-
-                    final companyData = {
-                      'name': nameController.text.trim(),
-                      'address': addressController.text.trim(),
-                      'phone': phoneController.text.trim(),
-                      'email': emailController.text.trim(),
-                      'owner_email': user.email!,
-                    };
-
-                    print(
-                        '📋 [CompanySelection] Company data prepared: $companyData');
-
-                    final newCompanyData =
-                        await ApiService.createCompany(companyData);
-
-                    print(
-                        '✅ [CompanySelection] Company created, received data: $newCompanyData');
-
-                    final newCompany = Company.fromJson(newCompanyData);
-
-                    print(
-                        '🎉 [CompanySelection] Company object created: ${newCompany.toString()}');
-
-                    Navigator.of(context).pop(newCompany);
-                  } else {
-                    print('❌ [CompanySelection] No authenticated user found');
-                  }
-                } catch (e) {
-                  print('💥 [CompanySelection] Error creating company: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to create company: $e')),
-                  );
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
