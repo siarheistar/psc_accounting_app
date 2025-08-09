@@ -89,7 +89,7 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
       );
       return;
     }
-    
+
     final updatedEmployee = await showDialog<Employee>(
       context: context,
       builder: (context) => EditEmployeeDialog(employee: employee),
@@ -269,9 +269,12 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: Colors.orange.withOpacity(0.2),
-                                              border: Border.all(color: Colors.orange),
-                                              borderRadius: BorderRadius.circular(4),
+                                              color: Colors.orange
+                                                  .withOpacity(0.2),
+                                              border: Border.all(
+                                                  color: Colors.orange),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
                                             ),
                                             child: const Text(
                                               'From Payroll',
@@ -333,8 +336,10 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                           },
                                           itemBuilder: (context) {
                                             // Check if this is a payroll-extracted employee
-                                            final isPayrollEmployee = employee.id.startsWith('payroll_');
-                                            
+                                            final isPayrollEmployee = employee
+                                                .id
+                                                .startsWith('payroll_');
+
                                             return [
                                               PopupMenuItem(
                                                 value: 'edit',
@@ -342,21 +347,22 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                                 child: ListTile(
                                                   leading: Icon(
                                                     Icons.edit,
-                                                    color: isPayrollEmployee 
-                                                        ? Colors.grey 
+                                                    color: isPayrollEmployee
+                                                        ? Colors.grey
                                                         : Colors.blue,
                                                   ),
                                                   title: Text(
-                                                    isPayrollEmployee 
+                                                    isPayrollEmployee
                                                         ? 'Edit (Read-only)'
                                                         : 'Edit',
                                                     style: TextStyle(
-                                                      color: isPayrollEmployee 
-                                                          ? Colors.grey 
+                                                      color: isPayrollEmployee
+                                                          ? Colors.grey
                                                           : null,
                                                     ),
                                                   ),
-                                                  contentPadding: EdgeInsets.zero,
+                                                  contentPadding:
+                                                      EdgeInsets.zero,
                                                 ),
                                               ),
                                               PopupMenuItem(
@@ -365,21 +371,22 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                                 child: ListTile(
                                                   leading: Icon(
                                                     Icons.delete,
-                                                    color: isPayrollEmployee 
-                                                        ? Colors.grey 
+                                                    color: isPayrollEmployee
+                                                        ? Colors.grey
                                                         : Colors.red,
                                                   ),
                                                   title: Text(
-                                                    isPayrollEmployee 
+                                                    isPayrollEmployee
                                                         ? 'Delete (Read-only)'
                                                         : 'Delete',
                                                     style: TextStyle(
-                                                      color: isPayrollEmployee 
-                                                          ? Colors.grey 
+                                                      color: isPayrollEmployee
+                                                          ? Colors.grey
                                                           : null,
                                                     ),
                                                   ),
-                                                  contentPadding: EdgeInsets.zero,
+                                                  contentPadding:
+                                                      EdgeInsets.zero,
                                                 ),
                                               ),
                                             ];
