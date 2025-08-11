@@ -48,19 +48,15 @@ class EnvironmentConfig:
             # Load configuration values
             self._load_config_values()
             
-            # Only validate during actual application startup, not during import/build
-            # This allows Docker builds to complete without requiring runtime secrets
-            if self.get_env('VALIDATE_ENV_ON_IMPORT', 'false').lower() == 'true':
-                self._validate_required_vars(exit_on_missing=False)
+            # Validate required environment variables
+            self._validate_required_vars()
             
             # Log configuration summary (without sensitive data)
             self._log_config_summary()
             
         except Exception as e:
             logger.error(f"❌ Failed to load environment configuration: {e}")
-            # Don't exit during import - allow the module to be imported for builds
-            if self.get_env('VALIDATE_ENV_ON_IMPORT', 'false').lower() == 'true':
-                sys.exit(1)
+            sys.exit(1)
     
     def _load_config_values(self) -> None:
         """Load all configuration values from environment variables"""
@@ -110,7 +106,7 @@ class EnvironmentConfig:
             'AWS_REGION': self.get_env('AWS_REGION', 'us-west-2'),
         })
     
-    def _validate_required_vars(self, exit_on_missing: bool = True) -> None:
+    def _validate_required_vars(self) -> None:
         """Validate that all required environment variables are set"""
         
         required_vars = [
@@ -133,17 +129,9 @@ class EnvironmentConfig:
                 missing_vars.append(var)
         
         if missing_vars:
-            if exit_on_missing:
-                logger.error(f"❌ Missing required environment variables: {missing_vars}")
-                logger.error("Please check your .env file or set these environment variables")
-                sys.exit(1)
-            else:
-                logger.warning(f"⚠️ Missing required environment variables: {missing_vars}")
-                logger.warning("These will be required when the application starts")
-    
-    def validate_startup_requirements(self) -> None:
-        """Validate required environment variables at application startup"""
-        self._validate_required_vars(exit_on_missing=True)
+            logger.error(f"❌ Missing required environment variables: {missing_vars}")
+            logger.error("Please check your .env file or set these environment variables")
+            sys.exit(1)
     
     def _log_config_summary(self) -> None:
         """Log configuration summary (excluding sensitive information)"""
