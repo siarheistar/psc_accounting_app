@@ -80,9 +80,16 @@ async def shutdown_event():
     close_db_pool()
 
 # Enable CORS for Flutter app
+# Configure CORS from environment variable ALLOWED_ORIGINS (comma-separated)
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+if allowed_origins_env.strip() == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your Flutter app's origin
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -112,6 +112,51 @@ psc_accounting_app/
    flutter run
    ```
 
+## 🌐 Deployment
+
+### Frontend: Firebase Hosting (recommended)
+
+Prerequisites:
+- Google account, Firebase CLI installed (`npm i -g firebase-tools`), `firebase login`
+
+Fast path (one command):
+```bash
+./scripts/deploy_firebase.sh
+```
+
+Manual steps:
+1) Build Flutter web
+```bash
+flutter build web
+```
+2) Ensure `firebase.json` has `"public": "build/web"` and SPA rewrite to `/index.html`
+3) Select your project (first time only)
+```bash
+firebase use --add
+```
+4) Deploy
+```bash
+firebase deploy --only hosting
+```
+
+### Backend: Render (free tier)
+
+Use the Dockerfile in `backend/` and the Render blueprint `backend/render.yaml`.
+
+One‑click:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+Manual:
+1) Create Web Service → Runtime: Docker → Root: `backend/` → Dockerfile: `backend/Dockerfile`
+2) Health check path: `/health`
+3) Set env vars (DB, ENVIRONMENT) in Render Dashboard
+4) Deploy; copy the public URL and update the Flutter API base URL
+
+### CORS
+Ensure FastAPI CORS origins allow your Firebase Hosting domain. In production, replace the wildcard with your exact origin.
+
+
 ### Database Setup
 1. Create a PostgreSQL/MySQL database
 2. Run the appropriate DDL script from `dbscripts/`

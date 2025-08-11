@@ -5,6 +5,7 @@ import '../context/simple_company_context.dart';
 import '../dialogs/edit_bank_statement_dialog.dart';
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
+import '../services/api_service.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -139,7 +140,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
 
               // Use the correct upload endpoint format matching expenses page
               final uri =
-                  Uri.parse('http://localhost:8000/attachments/upload').replace(
+                  Uri.parse('${ApiService.baseUrl}/attachments/upload').replace(
                 queryParameters: {
                   'entity_type': 'bank_statement',
                   'entity_id': bankStatement.id.toString(),
@@ -206,7 +207,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
           '📄 Fetching bank statement attachments for statement: ${bankStatement.id}');
 
       final uri = Uri.parse(
-              'http://localhost:8000/attachments/bank_statement/${bankStatement.id}')
+              '${ApiService.baseUrl}/attachments/bank_statement/${bankStatement.id}')
           .replace(
         queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1',
@@ -305,7 +306,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
           '📄 Downloading attachment: $attachmentId, filename: $filename');
 
       final response = await http.get(
-        Uri.parse('http://localhost:8000/attachments/$attachmentId/download'),
+        Uri.parse('${ApiService.baseUrl}/attachments/$attachmentId/download'),
       );
 
       if (response.statusCode == 200) {
@@ -359,7 +360,7 @@ class _BankStatementsPageState extends State<BankStatementsPage> {
         debugPrint('📄 Deleting attachment: $attachmentId');
 
         final response = await http.delete(
-          Uri.parse('http://localhost:8000/attachments/$attachmentId'),
+          Uri.parse('${ApiService.baseUrl}/attachments/$attachmentId'),
         );
 
         if (response.statusCode == 200) {

@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
-import '../models/accounting_models.dart';
-import '../screens/company_creation_page.dart';
 import 'package:flutter/foundation.dart';
+import 'api_service.dart';
+import '../models/accounting_models.dart';
+// Removed unused and duplicate imports
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DatabaseService {
@@ -16,11 +16,12 @@ class DatabaseService {
   // For development, we need to handle Flutter web's specific requirements
   static String get _baseUrl {
     if (kIsWeb) {
-      // For Flutter web, backend API is on port 8000 (no /api prefix)
-      return 'http://localhost:8000';
+      // For Flutter web, use centralized API base URL (overridable via --dart-define)
+      return ApiService.baseUrl;
     } else {
-      // For mobile emulator
-      return 'http://10.0.2.2:8000';
+      // For mobile emulator; allow override via dart-define API_BASE_URL
+      return const String.fromEnvironment('API_BASE_URL',
+          defaultValue: 'http://10.0.2.2:8000');
     }
   }
 

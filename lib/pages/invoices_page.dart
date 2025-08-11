@@ -11,6 +11,7 @@ import '../dialogs/add_invoice_dialog.dart';
 import '../dialogs/edit_invoice_dialog.dart';
 import '../utils/currency_utils.dart';
 import '../widgets/invoice_number_display.dart';
+import '../services/api_service.dart';
 
 class InvoicesPage extends StatefulWidget {
   const InvoicesPage({super.key});
@@ -218,7 +219,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
 
     try {
       // Use the new multipart form upload to the refactored attachment system
-      final uri = Uri.parse('http://localhost:8000/attachments/upload').replace(
+      final uri = Uri.parse('${ApiService.baseUrl}/attachments/upload').replace(
         queryParameters: {
           'entity_type': entityType,
           'entity_id': entityId,
@@ -288,7 +289,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
     try {
       // Use the new attachment listing endpoint
       final url =
-          Uri.parse('http://localhost:8000/attachments/invoice/$invoiceId');
+          Uri.parse('${ApiService.baseUrl}/attachments/invoice/$invoiceId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
@@ -400,7 +401,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
 
       // Use the new attachment download endpoint
       final url = Uri.parse(
-          'http://localhost:8000/attachments/download/${attachment['id']}');
+          '${ApiService.baseUrl}/attachments/download/${attachment['id']}');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
