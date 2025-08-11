@@ -17,9 +17,15 @@ if ! command -v firebase >/dev/null 2>&1; then
   exit 1
 fi
 
-# Build web
+# Build web (optionally inject API base URL)
 flutter pub get
-flutter build web
+if [[ -n "${API_BASE_URL:-}" ]]; then
+  echo "Building Flutter web with API_BASE_URL=$API_BASE_URL"
+  flutter build web --dart-define=API_BASE_URL="$API_BASE_URL"
+else
+  echo "Building Flutter web with default API_BASE_URL (http://127.0.0.1:8000)"
+  flutter build web
+fi
 
 # Ensure firebase project is selected; allow override via env
 if [[ -n "${FIREBASE_PROJECT:-}" ]]; then
