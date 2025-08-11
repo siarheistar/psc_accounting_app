@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/invoice_numbering.dart';
 import '../utils/currency_utils.dart';
 import '../pages/invoices_page.dart';
 import '../pages/expenses_page.dart';

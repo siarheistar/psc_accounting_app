@@ -10,6 +10,7 @@ import '../context/simple_company_context.dart';
 import '../dialogs/add_invoice_dialog.dart';
 import '../dialogs/edit_invoice_dialog.dart';
 import '../utils/currency_utils.dart';
+import '../widgets/invoice_number_display.dart';
 
 class InvoicesPage extends StatefulWidget {
   const InvoicesPage({super.key});
@@ -568,22 +569,6 @@ class _InvoicesPageState extends State<InvoicesPage> {
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return Colors.green;
-      case 'pending':
-      case 'sent':
-        return Colors.orange;
-      case 'overdue':
-        return Colors.red;
-      case 'draft':
-        return Colors.grey;
-      default:
-        return Colors.blue;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDemoMode = _dbService.isDemoMode;
@@ -847,35 +832,10 @@ class _InvoicesPageState extends State<InvoicesPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with invoice number and status
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                invoice.invoiceNumber,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(invoice.status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  invoice.status.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _getStatusColor(invoice.status),
-                  ),
-                ),
-              ),
-            ],
+          // Header row with invoice number and status - Using consistent widget
+          InvoiceCardHeader(
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
           ),
           const SizedBox(height: 12),
           // Client and amount

@@ -19,6 +19,9 @@ from database import initialize_db_pool, close_db_pool, execute_query
 from attachment_manager import AttachmentManager
 import attachment_endpoints
 
+# Import VAT system
+import vat_endpoints
+
 app = FastAPI(title="PSC Accounting API", version="1.0.0")
 
 # ================== GLOBAL VARIABLES ==================
@@ -1876,6 +1879,46 @@ async def set_storage_config(mode: str = Query(..., regex="^(local|database)$"))
 # ================== YOUR EXISTING ENDPOINTS ==================
 # Add all your existing company, invoice, expense, payroll endpoints here...
 # I'm keeping this clean file focused on the PDF storage implementation
+
+# ================== VAT ENHANCEMENT ENDPOINTS ==================
+
+from vat_service import VATService
+from vat_models import ExpenseRequest, InvoiceRequest, EWorkerRequest, MileageRequest
+from decimal import Decimal
+
+@app.get("/vat/rates")
+async def get_vat_rates(country: str = "Ireland", active_only: bool = True):
+    """Get VAT rates for a country"""
+    return [rate.dict() for rate in VATService.get_vat_rates(country, active_only)]
+
+@app.get("/vat/expense-categories")
+async def get_expense_categories():
+    """Get all expense categories with VAT rates and business usage options"""
+    categories = VATService.get_expense_categories()
+    vat_rates = VATService.get_vat_rates()
+    business_usage_options = VATService.get_business_usage_options()
+    
+    return {
+        "categories": [cat.dict() for cat in categories],
+        "vat_rates": [rate.dict() for rate in vat_rates],
+        "business_usage_options": [opt.dict() for opt in business_usage_options]
+    }
+
+@app.post("/vat/calculate")
+async def calculate_vat(
+    net_amount: float,
+    vat_rate_id: Optional[int] = None,
+    vat_rate_percentage: Optional[float] = None,
+    business_usage_percentage: float = 100.0
+):
+    """Calculate VAT amounts"""
+    vat_calc = VATService.calculate_vat(
+        net_amount=Decimal(str(net_amount)),
+        vat_rate_id=vat_rate_id,
+        vat_rate_percentage=Decimal(str(vat_rate_percentage)) if vat_rate_percentage else None,
+        business_usage_percentage=Decimal(str(business_usage_percentage))
+    )
+    return vat_calc.dict()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
