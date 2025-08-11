@@ -1,7 +1,30 @@
+# PSC Accounting API Dependencies
+
+# Core FastAPI framework
 fastapi>=0.115.0
 uvicorn>=0.32.0
 pydantic>=2.10.0
-python-multipart>=0.0.12
+
+# Database
 psycopg2-binary
+asyncpg>=0.29.0
+
+# Environment and configuration management
 python-dotenv
-python-multipart
+
+# File handling and uploads
+python-multipart>=0.0.12
+
+# Security and authentication (for future use)
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+
+# HTTP client and requests
+httpx>=0.25.0
+requests>=2.31.0
+
+# Logging and monitoring
+structlog>=23.2.0
+
+# Date and time utilities
+python-dateutil>=2.8.2

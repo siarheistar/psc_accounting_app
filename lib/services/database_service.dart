@@ -8,11 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DatabaseService {
-  // Your PostgreSQL connection details
-  static const String _host = 'pscdb.cnacsqi4u8qw.eu-west-1.rds.amazonaws.com';
-  static const String _port = '5432';
-  static const String _database = 'pscdb';
-  static const String _username = 'postgres';
+  // Database connection details are now handled by the backend API
+  // The Flutter frontend does not need direct database credentials
+  // All database operations go through the secure backend API
 
   // For production, deploy the backend API and use that URL
   // For development, we need to handle Flutter web's specific requirements
