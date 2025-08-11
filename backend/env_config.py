@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
+import json
 import logging
 
 # Configure logging
@@ -45,6 +46,9 @@ class EnvironmentConfig:
                 logger.warning(f"⚠️ No .env file found at: {self.env_file}")
                 logger.info("Using system environment variables only")
             
+            # Optionally load from AWS Secrets Manager (if configured)
+            self._load_aws_secrets_into_env()
+
             # Load configuration values
             self._load_config_values()
             
@@ -103,8 +107,52 @@ class EnvironmentConfig:
             'AWS_ACCESS_KEY_ID': self.get_env('AWS_ACCESS_KEY_ID'),
             'AWS_SECRET_ACCESS_KEY': self.get_env('AWS_SECRET_ACCESS_KEY'),
             'AWS_S3_BUCKET': self.get_env('AWS_S3_BUCKET'),
-            'AWS_REGION': self.get_env('AWS_REGION', 'us-west-2'),
+            'AWS_REGION': self.get_env('AWS_REGION', 'eu-west-1'),
+            'AWS_SECRETS_MANAGER_SECRET_ID': self.get_env('AWS_SECRETS_MANAGER_SECRET_ID'),
         })
+
+    def _load_aws_secrets_into_env(self) -> None:
+        """If configured, fetch secrets from AWS Secrets Manager and inject into os.environ.
+
+        Expects:
+          - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (or an IAM role in env)
+          - AWS_REGION (defaults to eu-west-1 if missing)
+          - AWS_SECRETS_MANAGER_SECRET_ID (the Secret ARN or name)
+        Secret value should be a JSON object with keys like DB_HOST, DB_PORT, DB_NAME, DB_USER,
+        DB_PASSWORD, JWT_SECRET, API_SECRET_KEY, etc.
+        """
+        secret_id = os.getenv('AWS_SECRETS_MANAGER_SECRET_ID') or os.getenv('AWS_SECRET_ARN')
+        if not secret_id:
+            return
+        try:
+            # Import boto3 lazily to avoid hard dependency if not used
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+
+            region = os.getenv('AWS_REGION', 'eu-west-1')
+            client = boto3.client('secretsmanager', region_name=region)
+            resp = client.get_secret_value(SecretId=secret_id)
+            secret_str = resp.get('SecretString')
+            if not secret_str and 'SecretBinary' in resp:
+                secret_str = resp['SecretBinary'].decode('utf-8')
+
+            if not secret_str:
+                logger.warning("AWS Secrets Manager returned empty secret value")
+                return
+
+            data = json.loads(secret_str)
+            if not isinstance(data, dict):
+                logger.warning("AWS secret is not a JSON object; skipping")
+                return
+
+            # Inject into process env if not already set
+            for k, v in data.items():
+                if k and v is not None and os.getenv(k) is None:
+                    os.environ[k] = str(v)
+
+            logger.info("🔐 Loaded configuration from AWS Secrets Manager")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load AWS Secrets Manager secret: {e}")
     
     def _validate_required_vars(self) -> None:
         """Validate that all required environment variables are set"""
