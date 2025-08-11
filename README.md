@@ -84,8 +84,11 @@ psc_accounting_app/
 
 3. Set up environment variables:
    ```bash
-   cp .env.example .env
-   # Edit .env with your database credentials
+   # For development
+   cp .env.development .env
+   # OR use the automated setup script
+   ./setup_secrets.sh
+   # Edit .env with your actual database credentials
    ```
 
 4. Run database migrations:
@@ -163,11 +166,43 @@ The project includes a comprehensive Postman collection with 43+ tests:
 
 ## 📝 Environment Configuration
 
-### Backend Environment Variables
+### Environment Setup
+The project uses environment-specific configuration files:
+- `.env.development` - Development settings (local database, debug enabled)
+- `.env.staging` - Staging environment settings
+- `.env.production` - Production settings (secure, optimized)
+- `.env.example` - Generic template
+
+### Automated Setup
+Use the included setup script for secure configuration:
+```bash
+./setup_secrets.sh
+```
+
+### Manual Setup
+```bash
+cd backend/
+cp .env.development .env  # For development
+# Edit .env with your actual credentials
+```
+
+### Key Environment Variables
 ```env
-DATABASE_URL=postgresql://user:password@localhost/psc_accounting
-FIREBASE_CREDENTIALS_PATH=path/to/firebase-credentials.json
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=psc_accounting_dev
+DB_USER=postgres
+DB_PASSWORD=your-password
+
+# Application Settings
+ENVIRONMENT=development
+DEBUG=true
 API_PORT=8000
+
+# Security (auto-generated for production)
+JWT_SECRET=your-jwt-secret
+API_SECRET_KEY=your-api-secret
 ```
 
 ### Firebase Configuration

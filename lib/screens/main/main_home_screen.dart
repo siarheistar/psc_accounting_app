@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../context/simple_company_context.dart';
-import '../../services/navigation_manager.dart';
 import '../../pages/home_page.dart';
-import '../features/invoices_screen.dart';
-import '../features/expenses_screen.dart';
 import '../../dialogs/manage_employees_dialog.dart';
 import '../admin/admin_screen.dart';
 
@@ -16,41 +13,6 @@ class MainHomeScreen extends StatefulWidget {
 }
 
 class _MainHomeScreenState extends State<MainHomeScreen> {
-  int _selectedIndex = 0;
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _pages = [
-      const HomePage(),
-      InvoicesScreen(),
-      ExpensesScreen(),
-    ];
-
-    // Restore the last selected tab from browser storage with bounds checking
-    int savedIndex = NavigationManager.getCurrentTab();
-    _selectedIndex =
-        (savedIndex >= 0 && savedIndex < _pages.length) ? savedIndex : 0;
-    print(
-        '🏠 [MainHomeScreen] Initialized with tab index: $_selectedIndex (saved was: $savedIndex)');
-  }
-
-  void _onItemTapped(int index) {
-    // Add bounds checking
-    if (index >= 0 && index < _pages.length) {
-      setState(() {
-        _selectedIndex = index;
-      });
-
-      // Save the current tab to browser storage
-      NavigationManager.saveCurrentTab(index);
-      print('📱 [MainHomeScreen] Switched to tab: $index');
-    } else {
-      print('⚠️ [MainHomeScreen] Invalid tab index: $index, ignoring');
-    }
-  }
 
   void _handleCompanyChange() {
     // Clear company context
@@ -168,30 +130,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt),
-            label: 'Invoices',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Expenses',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blue,
-        onTap: _onItemTapped,
-      ),
+      body: const HomePage(),
     );
   }
 }

@@ -86,6 +86,7 @@ class EnvironmentConfig:
             'DB_MIN_CONNECTIONS': int(self.get_env('DB_MIN_CONNECTIONS', '1')),
             'DB_MAX_CONNECTIONS': int(self.get_env('DB_MAX_CONNECTIONS', '20')),
             'DB_ECHO': self.get_env('DB_ECHO', 'false').lower() == 'true',
+            'DB_SCHEMA': self.get_env('DB_SCHEMA', 'public'),
             
             # Security
             'JWT_SECRET': self.get_env('JWT_SECRET'),
@@ -149,6 +150,7 @@ class EnvironmentConfig:
         logger.info(f"  Environment: {safe_config.get('ENVIRONMENT')}")
         logger.info(f"  Debug: {safe_config.get('DEBUG')}")
         logger.info(f"  Database: {safe_config.get('DB_HOST')}:{safe_config.get('DB_PORT')}/{safe_config.get('DB_NAME')}")
+        logger.info(f"  Schema: {safe_config.get('DB_SCHEMA')}")
         logger.info(f"  Storage Mode: {safe_config.get('STORAGE_MODE')}")
         logger.info(f"  API: {safe_config.get('API_HOST')}:{safe_config.get('API_PORT')}")
     

@@ -55,12 +55,21 @@ if [ -f ".env" ]; then
     fi
 fi
 
-# Copy template file
-if [ -f ".env.example" ]; then
-    cp .env.example .env
-    echo -e "${GREEN}✅ Created .env from template${NC}"
+# Copy template file based on environment
+env_template=".env.example"
+if [ "$environment" = "development" ] && [ -f ".env.development" ]; then
+    env_template=".env.development"
+elif [ "$environment" = "staging" ] && [ -f ".env.staging" ]; then
+    env_template=".env.staging"
+elif [ "$environment" = "production" ] && [ -f ".env.production" ]; then
+    env_template=".env.production"
+fi
+
+if [ -f "$env_template" ]; then
+    cp "$env_template" .env
+    echo -e "${GREEN}✅ Created .env from $env_template${NC}"
 else
-    echo -e "${RED}❌ .env.example not found${NC}"
+    echo -e "${RED}❌ Template file $env_template not found${NC}"
     exit 1
 fi
 

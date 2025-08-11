@@ -60,13 +60,17 @@ ENV/
 # Environment variables and secrets
 .env
 .env.local
-.env.production
+.env.development
 .env.staging
+.env.production
 .env.*.local
 *.env
 backend/.env
 backend/.env.*
+backend/.env.backup.*
+!.env.example
 !backend/.env.example
+!**/*.env.example
 
 # Node.js
 node_modules/

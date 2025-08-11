@@ -4,6 +4,7 @@ from psycopg2 import pool
 from dotenv import load_dotenv
 import logging
 from env_config import env_config
+from schema_manager import schema_manager, convert_legacy_query
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ def initialize_db_pool():
         )
         logger.info(f"🗄️ [Database] Connected to PostgreSQL at {DB_CONFIG['host']}:{DB_CONFIG['port']}")
         logger.info(f"📊 [Database] Database: {DB_CONFIG['database']}")
+        logger.info(f"📋 [Database] Schema: {schema_manager.get_schema()}")
         logger.info(f"🔐 [Database] SSL Mode: {DB_CONFIG.get('sslmode', 'prefer')}")
         return True
     except Exception as e:
@@ -69,7 +71,7 @@ def close_db_pool():
 
 # Database operations
 def execute_query(query, params=None, fetch=False):
-    """Execute a database query"""
+    """Execute a database query with automatic schema conversion"""
     conn = None
     cursor = None
     try:
@@ -77,8 +79,11 @@ def execute_query(query, params=None, fetch=False):
         if not conn:
             raise Exception("Failed to get database connection")
         
+        # Convert legacy queries with hardcoded 'public.' schema
+        schema_aware_query = convert_legacy_query(query)
+        
         cursor = conn.cursor()
-        cursor.execute(query, params)
+        cursor.execute(schema_aware_query, params)
         
         if fetch:
             if query.strip().upper().startswith('SELECT'):
@@ -87,24 +92,24 @@ def execute_query(query, params=None, fetch=False):
                 # Fetch all rows and convert to list of dictionaries
                 rows = cursor.fetchall()
                 result = [dict(zip(columns, row)) for row in rows]
-                print(f"🔍 [Database] Query executed: {query[:50]}... | Found {len(result)} rows")
+                print(f"🔍 [Database] Query executed: {schema_aware_query[:50]}... | Found {len(result)} rows")
                 return result
             else:
                 # INSERT, UPDATE, DELETE with RETURNING - need to commit AND fetch result
                 result = cursor.fetchone()
                 conn.commit()  # CRITICAL: Commit the transaction!
-                print(f"✅ [Database] Query executed: {query[:50]}... | Committed to database")
+                print(f"✅ [Database] Query executed: {schema_aware_query[:50]}... | Committed to database")
                 print(f"🔍 [Database] Raw result: {result}, type: {type(result)}")
                 return result
         else:
             conn.commit()
-            print(f"✅ [Database] Query executed: {query[:50]}... | Committed to database")
+            print(f"✅ [Database] Query executed: {schema_aware_query[:50]}... | Committed to database")
             return cursor.rowcount
             
     except Exception as e:
         if conn:
             conn.rollback()
-        print(f"❌ [Database] Query failed: {query[:50]}...")
+        print(f"❌ [Database] Query failed: {schema_aware_query[:50]}...")
         print(f"❌ [Database] Error details: {e}")
         print(f"❌ [Database] Error type: {type(e)}")
         raise e
