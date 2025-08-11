@@ -1,0 +1,15 @@
+PSC Accounting Test Document
+==========================
+
+This is a test document to verify the new local file storage attachment system.
+
+Features implemented:
+- ✅ Local file storage organized by entity type (invoice, expense, bank_statement, payroll)
+- ✅ Date-organized directory structure (YYYY-MM-DD)
+- ✅ Company-specific storage paths
+- ✅ Unique filename generation with timestamps
+- ✅ Minimal database metadata storage (no file content serialization)
+- ✅ Upload, view, and delete functionality
+
+File created: ${new Date().toISOString()}
+System: PSC Accounting App - Refactored Attachment Management

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class AddInvoiceDialog extends StatefulWidget {
   const AddInvoiceDialog({super.key});
@@ -13,17 +14,16 @@ class AddInvoiceDialog extends StatefulWidget {
 
 class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _invoiceNumberController = TextEditingController();
   final _clientNameController = TextEditingController();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
   String _selectedStatus = 'pending'; // Add status field
+  bool _isSaving = false; // Add saving state to prevent double submission
 
   @override
   void dispose() {
-    _invoiceNumberController.dispose();
     _amountController.dispose();
     _descriptionController.dispose();
     _clientNameController.dispose();
@@ -34,7 +34,7 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   void initState() {
     super.initState();
     _initializeCompanyContext();
-    _generateInvoiceNumber();
+    // Removed _generateInvoiceNumber() - backend will generate the invoice number
   }
 
   void _initializeCompanyContext() {
@@ -90,18 +90,26 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
     print('🔍 [DEBUG] === END COMPANY CONTEXT INITIALIZATION ===');
   }
 
-  void _generateInvoiceNumber() {
-    // Generate invoice number based on current date
-    final now = DateTime.now();
-    final invoiceNumber =
-        'INV-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(8)}';
-    _invoiceNumberController.text = invoiceNumber;
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   Future<void> _saveInvoice() async {
+    // Prevent double submission
+    if (_isSaving) {
+      print(
+          '🧾 [AddInvoiceDialog] Save already in progress, ignoring duplicate request');
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     print('🧾 [AddInvoiceDialog] === STARTING INVOICE SAVE ===');
+    setState(() => _isSaving = true);
 
     // Pre-save company context verification
     final preCheckCompany = SimpleCompanyContext.selectedCompany;
@@ -143,7 +151,8 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
       print('🧾 [AddInvoiceDialog] Creating invoice object...');
       final invoice = Invoice(
         id: '',
-        invoiceNumber: _invoiceNumberController.text,
+        invoiceNumber:
+            '', // Backend will generate the invoice number based on ID
         clientName: _clientNameController.text,
         amount: double.parse(_amountController.text),
         description: _descriptionController.text,
@@ -209,6 +218,10 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
         print(
             '🧾 [AddInvoiceDialog] Widget not mounted, skipping error dialog');
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -239,20 +252,6 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
-                  controller: _invoiceNumberController,
-                  decoration: const InputDecoration(
-                    labelText: 'Invoice Number',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter an invoice number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
                   controller: _clientNameController,
                   decoration: const InputDecoration(
                     labelText: 'Client Name',
@@ -268,10 +267,10 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _amountController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Amount',
-                    border: OutlineInputBorder(),
-                    prefixText: '\$',
+                    border: const OutlineInputBorder(),
+                    prefixText: _getCurrencySymbol(),
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
@@ -358,8 +357,17 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: _saveInvoice,
-          child: const Text('Save'),
+          onPressed: _isSaving ? null : _saveInvoice, // Disable when saving
+          child: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('Save'),
         ),
       ],
     );

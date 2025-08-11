@@ -8,7 +8,13 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 
 import '../services/database_service.dart';
+import '../services/api_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
+import '../pages/invoices_page.dart';
+import '../pages/expenses_page.dart';
+import '../pages/payroll_page.dart';
+import '../pages/bank_statements_page.dart';
 import '../models/accounting_models.dart';
 import '../dialogs/add_invoice_dialog.dart';
 import '../dialogs/add_expense_dialog.dart';
@@ -62,6 +68,61 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    return CurrencyUtils.getCurrencySymbol(selectedCompany?.currency);
+  }
+
+  /// Helper function to decode Unicode filename strings
+  String _decodeFilename(String filename) {
+    try {
+      debugPrint('🔍 _decodeFilename input: $filename');
+      debugPrint('🔍 Input runes: ${filename.runes.toList()}');
+
+      // First check if it contains Unicode escape sequences like \u0421
+      if (filename.contains(r'\u')) {
+        // Convert Unicode escape sequences to actual characters
+        String decoded = filename;
+        final unicodePattern = RegExp(r'\\u([0-9A-Fa-f]{4})');
+        decoded = decoded.replaceAllMapped(unicodePattern, (match) {
+          final hexCode = match.group(1)!;
+          final charCode = int.parse(hexCode, radix: 16);
+          return String.fromCharCode(charCode);
+        });
+        debugPrint('🔍 Decoded from escape sequences: $decoded');
+        return decoded;
+      }
+
+      // Try URL decoding if it contains percent encoding
+      if (filename.contains('%')) {
+        final decoded = Uri.decodeComponent(filename);
+        debugPrint('🔍 Decoded from URL encoding: $decoded');
+        return decoded;
+      }
+
+      // If it looks like it has replacement characters, try to fix encoding issues
+      if (filename.contains('�') || filename.contains('Ð')) {
+        debugPrint('🔍 Detected potential encoding issues');
+        // Try to re-encode as Latin-1 and decode as UTF-8
+        try {
+          final bytes = latin1.encode(filename);
+          final decoded = utf8.decode(bytes);
+          debugPrint('🔍 Re-encoded and decoded: $decoded');
+          return decoded;
+        } catch (e) {
+          debugPrint('🔍 Re-encoding failed: $e');
+        }
+      }
+
+      // Return as-is if no special encoding detected
+      debugPrint('🔍 Returning filename as-is: $filename');
+      return filename;
+    } catch (e) {
+      debugPrint('🔍 Failed to decode filename: $filename, error: $e');
+      return filename; // Return original if decoding fails
+    }
+  }
+
   Future<void> _loadDashboardData() async {
     setState(() {
       _isLoading = true;
@@ -110,32 +171,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showAddDialog() {
-    if (_dbService.isDemoMode) {
-      _showSnackBar(
-          'Cannot add transactions in demo mode. Create a real company first.',
-          isError: true);
-      return;
-    }
-
-    switch (_selectedTabIndex) {
-      case 0:
-        _showAddInvoiceDialog();
-        break;
-      case 1:
-        _showAddExpenseDialog();
-        break;
-      case 2:
-        _showAddPayrollDialog();
-        break;
-      case 3:
-        _showAddBankStatementDialog();
-        break;
-      default:
-        _addSampleTransaction();
-    }
-  }
-
   void _showAddInvoiceDialog() async {
     final result = await showDialog<Invoice>(
       context: context,
@@ -165,13 +200,10 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (expense != null) {
-      try {
-        await _dbService.insertExpense(expense);
-        _showSnackBar('Expense created successfully!');
-        await _loadDashboardData();
-      } catch (e) {
-        _showSnackBar('Failed to create expense: $e', isError: true);
-      }
+      // Dialog has already handled the insertion, just refresh the data
+      debugPrint('🏠 ✅ Expense created successfully, refreshing data');
+      _showSnackBar('Expense created successfully!');
+      await _loadDashboardData();
     }
   }
 
@@ -209,14 +241,14 @@ class _HomePageState extends State<HomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('PDF Attachments - ${entityType.toUpperCase()}'),
+        title: Text('File Attachments - ${entityType.toUpperCase()}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.upload_file, color: Colors.blue),
-              title: const Text('Upload PDF'),
-              subtitle: const Text('Attach a PDF document'),
+              title: const Text('Upload File'),
+              subtitle: const Text('Attach a document (PDF, images, etc.)'),
               onTap: () {
                 Navigator.pop(context);
                 _uploadPDF(entityType, entityId);
@@ -225,7 +257,7 @@ class _HomePageState extends State<HomePage> {
             ListTile(
               leading: const Icon(Icons.folder_open, color: Colors.green),
               title: const Text('View Attachments'),
-              subtitle: const Text('See all attached PDFs'),
+              subtitle: const Text('See all attached files'),
               onTap: () {
                 Navigator.pop(context);
                 _viewPDFAttachments(entityType, entityId);
@@ -246,8 +278,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _uploadPDF(String entityType, String entityId) async {
     try {
       if (kIsWeb) {
-        // Web file picker
-        final input = html.FileUploadInputElement()..accept = '.pdf';
+        // Web file picker - accept multiple file types
+        final input = html.FileUploadInputElement()
+          ..accept = '.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.xls,.xlsx';
         input.click();
 
         input.onChange.listen((e) async {
@@ -255,8 +288,11 @@ class _HomePageState extends State<HomePage> {
           if (files!.isEmpty) return;
 
           final file = files[0];
-          if (!file.name.toLowerCase().endsWith('.pdf')) {
-            _showSnackBar('Please select a PDF file', isError: true);
+
+          // Validate file size (25MB limit)
+          if (file.size > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.',
+                isError: true);
             return;
           }
 
@@ -266,68 +302,85 @@ class _HomePageState extends State<HomePage> {
             try {
               final bytes = reader.result as List<int>;
               await _uploadPDFToServer(entityType, entityId, file.name, bytes);
-              _showSnackBar('PDF uploaded successfully!');
+              _showSnackBar('File uploaded successfully!');
             } catch (e) {
-              _showSnackBar('Failed to upload PDF: $e', isError: true);
+              _showSnackBar('Failed to upload file: $e', isError: true);
             }
           });
         });
       } else {
-        // Mobile file picker
+        // Mobile file picker - allow various file types
         final result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['pdf'],
+          type: FileType.any,
+          allowedExtensions: null, // Allow all file types
         );
 
         if (result != null && result.files.single.bytes != null) {
           final file = result.files.single;
+
+          // Validate file size
+          if (file.size > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.',
+                isError: true);
+            return;
+          }
+
           await _uploadPDFToServer(
               entityType, entityId, file.name, file.bytes!);
-          _showSnackBar('PDF uploaded successfully!');
+          _showSnackBar('File uploaded successfully!');
         }
       }
     } catch (e) {
-      _showSnackBar('Failed to upload PDF: $e', isError: true);
+      _showSnackBar('Failed to upload file: $e', isError: true);
     }
   }
 
   Future<void> _uploadPDFToServer(String entityType, String entityId,
       String filename, List<int> bytes) async {
-    debugPrint('📎 === PDF UPLOAD ATTEMPT ===');
+    debugPrint('📎 === NEW ATTACHMENT UPLOAD ===');
     debugPrint('📎 Entity Type: $entityType');
     debugPrint('📎 Entity ID: $entityId');
     debugPrint('📎 Company ID: ${_dbService.currentCompanyId}');
     debugPrint('📎 Filename: $filename');
     debugPrint('📎 File Size: ${bytes.length} bytes');
 
-    // Backend expects all parameters as query parameters
-    final queryParams = {
-      'entity_type': entityType,
-      'entity_id': entityId,
-      'company_id': _dbService.currentCompanyId ?? '1',
-      'filename': filename,
-      'file_data':
-          base64Encode(bytes), // Convert bytes to base64 for query param
-    };
-
-    final url = Uri.parse('http://localhost:8000/documents/upload')
-        .replace(queryParameters: queryParams);
-    debugPrint('📎 Upload URL: $url');
-
-    debugPrint('📎 Request query params: $queryParams');
-
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+      // Use the new multipart form upload to the refactored attachment system
+      final uri = Uri.parse('${ApiService.baseUrl}/attachments/upload').replace(
+        queryParameters: {
+          'entity_type': entityType,
+          'entity_id': entityId,
+          'company_id': _dbService.currentCompanyId ?? '1',
         },
       );
 
+      debugPrint('📎 Upload URL: $uri');
+
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add the file as multipart form data (no base64 encoding needed!)
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+        ),
+      );
+
+      // Add description as form field
+      request.fields['description'] = 'Uploaded from PSC Accounting App';
+
+      // Add headers
+      request.headers.addAll({
+        'Accept': 'application/json',
+      });
+
+      debugPrint('📎 Sending multipart request...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
       debugPrint('📎 === UPLOAD RESPONSE ===');
       debugPrint('📎 Status Code: ${response.statusCode}');
-      debugPrint('📎 Response Headers: ${response.headers}');
       debugPrint('📎 Response Body: ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -339,6 +392,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       debugPrint('📎 === UPLOAD SUCCESS ===');
+      debugPrint('📎 File successfully uploaded to local storage');
     } catch (e) {
       debugPrint('📎 === UPLOAD ERROR ===');
       debugPrint('📎 Exception: $e');
@@ -368,22 +422,73 @@ class _HomePageState extends State<HomePage> {
               final attachments = snapshot.data ?? [];
 
               if (attachments.isEmpty) {
-                return const Center(child: Text('No PDF attachments found'));
+                return const Center(child: Text('No file attachments found'));
               }
 
               return ListView.builder(
                 itemCount: attachments.length,
                 itemBuilder: (context, index) {
                   final attachment = attachments[index];
+                  final rawFilename = attachment['original_filename'] ??
+                      attachment['filename'] ??
+                      'Unknown';
+
+                  // Decode the filename to handle Unicode characters properly
+                  final filename = _decodeFilename(rawFilename);
+
+                  debugPrint('🔍 Raw filename: $rawFilename');
+                  debugPrint('🔍 Decoded filename: $filename');
+                  debugPrint('🔍 Filename length: ${filename.length}');
+                  debugPrint(
+                      '🔍 First few chars: ${filename.length > 0 ? filename.substring(0, filename.length.clamp(0, 10)) : 'empty'}');
+
+                  // Determine file icon based on file extension
+                  IconData fileIcon = Icons.description;
+                  Color iconColor = Colors.grey;
+
+                  if (filename.toLowerCase().endsWith('.pdf')) {
+                    fileIcon = Icons.picture_as_pdf;
+                    iconColor = Colors.red;
+                  } else if (filename
+                      .toLowerCase()
+                      .contains(RegExp(r'\.(jpg|jpeg|png|gif)$'))) {
+                    fileIcon = Icons.image;
+                    iconColor = Colors.blue;
+                  } else if (filename
+                      .toLowerCase()
+                      .contains(RegExp(r'\.(doc|docx)$'))) {
+                    fileIcon = Icons.description;
+                    iconColor = Colors.blue[800]!;
+                  } else if (filename
+                      .toLowerCase()
+                      .contains(RegExp(r'\.(xls|xlsx)$'))) {
+                    fileIcon = Icons.table_chart;
+                    iconColor = Colors.green;
+                  } else if (filename.toLowerCase().endsWith('.txt')) {
+                    fileIcon = Icons.text_snippet;
+                    iconColor = Colors.grey[700]!;
+                  }
+
                   return ListTile(
-                    leading:
-                        const Icon(Icons.picture_as_pdf, color: Colors.red),
-                    title: Text(attachment['filename'] ?? 'Unknown'),
-                    subtitle:
-                        Text('${(attachment['file_size'] ?? 0) ~/ 1024} KB'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.download),
-                      onPressed: () => _downloadPDF(attachment['id']),
+                    leading: Icon(fileIcon, color: iconColor),
+                    title: Text(filename),
+                    subtitle: Text(attachment['file_size_human'] ??
+                        '${(attachment['file_size'] ?? 0) ~/ 1024} KB'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.download),
+                          onPressed: () => _downloadPDF(attachment['id']),
+                          tooltip: 'Download',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () =>
+                              _deletePDF(attachment['id'].toString(), filename),
+                          tooltip: 'Delete',
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -404,104 +509,215 @@ class _HomePageState extends State<HomePage> {
   Future<List<Map<String, dynamic>>> _getPDFAttachments(
       String entityType, String entityId) async {
     try {
+      // Use the new attachment listing endpoint
       final url =
-          Uri.parse('http://localhost:8000/documents/$entityType/$entityId');
+          Uri.parse('${ApiService.baseUrl}/attachments/$entityType/$entityId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
         }),
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Charset': 'utf-8',
+        },
       );
 
+      debugPrint('📎 === GET ATTACHMENTS ===');
+      debugPrint('📎 URL: $url');
+      debugPrint('📎 Status: ${response.statusCode}');
+      debugPrint('📎 Response body length: ${response.body.length}');
+      debugPrint('📎 Content-Type: ${response.headers['content-type']}');
+
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        // Explicitly decode as UTF-8
+        final responseBody = utf8.decode(response.bodyBytes);
+        final dynamic responseData = json.decode(responseBody);
+
+        // New attachment system returns an object with attachments array
+        if (responseData is Map<String, dynamic> &&
+            responseData.containsKey('attachments')) {
+          final List<dynamic> attachments = responseData['attachments'] ?? [];
+          debugPrint('📎 Found ${attachments.length} attachments');
+          return attachments.cast<Map<String, dynamic>>();
+        } else if (responseData is List) {
+          // Fallback for old format
+          debugPrint(
+              '📎 Found ${responseData.length} attachments (old format)');
+          return responseData.cast<Map<String, dynamic>>();
+        } else {
+          debugPrint('📎 Unexpected response format: $responseData');
+          return [];
+        }
       } else {
-        throw Exception('Failed to fetch attachments');
+        debugPrint('📎 Failed to fetch attachments: ${response.statusCode}');
+        throw Exception('Failed to fetch attachments: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching PDF attachments: $e');
+      debugPrint('📎 Error fetching attachments: $e');
       return [];
     }
   }
 
   Future<void> _downloadPDF(int documentId) async {
     try {
-      debugPrint('📥 === STARTING PDF DOWNLOAD ===');
-      debugPrint('📥 Document ID: $documentId');
+      debugPrint('📥 === STARTING ATTACHMENT DOWNLOAD ===');
+      debugPrint('📥 Attachment ID: $documentId');
 
-      final data = await _dbService.downloadAttachment(documentId);
+      // Use the new attachment download endpoint
+      final url =
+          Uri.parse('${ApiService.baseUrl}/attachments/download/$documentId');
+      final response = await http.get(
+        url.replace(queryParameters: {
+          'company_id': _dbService.currentCompanyId ?? '1'
+        }),
+      );
 
-      final filename = data['filename'];
-      final fileData = data['file_data'];
+      debugPrint('📥 Download Status: ${response.statusCode}');
+      debugPrint('📥 Content-Type: ${response.headers['content-type']}');
+      debugPrint('📥 All headers: ${response.headers}');
 
-      if (filename == null || fileData == null) {
-        throw Exception(
-            'Invalid download response: missing filename or file_data');
-      }
+      if (response.statusCode == 200) {
+        // Get filename from Content-Disposition header or use default
+        String filename = 'attachment';
+        final contentDisposition = response.headers['content-disposition'];
+        debugPrint('📥 Content-Disposition (exact): $contentDisposition');
 
-      if (kIsWeb) {
-        // Web download
-        final bytes = base64.decode(fileData);
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.document.createElement('a') as html.AnchorElement
-          ..href = url
-          ..style.display = 'none'
-          ..download = filename;
-        html.document.body!.children.add(anchor);
-        anchor.click();
-        html.document.body!.children.remove(anchor);
-        html.Url.revokeObjectUrl(url);
+        // Try alternative header keys (case variations)
+        final altContentDisposition = response.headers['Content-Disposition'] ??
+            response.headers['CONTENT-DISPOSITION'] ??
+            response.headers['content-Disposition'];
+        debugPrint(
+            '📥 Alternative Content-Disposition: $altContentDisposition');
 
-        debugPrint('📥 === DOWNLOAD SUCCESS ===');
-        debugPrint('📥 File downloaded: $filename');
-        _showSnackBar('PDF downloaded successfully!');
+        final actualContentDisposition =
+            contentDisposition ?? altContentDisposition;
+
+        if (actualContentDisposition != null) {
+          debugPrint('📥 Using Content-Disposition: $actualContentDisposition');
+
+          // Try RFC 5987 encoding first (filename*=UTF-8''encoded_name)
+          final rfc5987Match = RegExp(r"filename\*=UTF-8''([^;]+)")
+              .firstMatch(actualContentDisposition);
+          if (rfc5987Match != null) {
+            final encodedFilename = rfc5987Match.group(1) ?? '';
+            try {
+              filename = Uri.decodeComponent(encodedFilename);
+              debugPrint('📥 Decoded RFC 5987 filename: $filename');
+            } catch (e) {
+              debugPrint('📥 Failed to decode RFC 5987 filename: $e');
+              // Fallback to simple quoted filename
+              final simpleMatch = RegExp(r'filename="([^"]+)"')
+                  .firstMatch(actualContentDisposition);
+              if (simpleMatch != null) {
+                filename = simpleMatch.group(1) ?? filename;
+              }
+            }
+          } else {
+            // Fallback to simple quoted filename
+            final simpleMatch = RegExp(r'filename="([^"]+)"')
+                .firstMatch(actualContentDisposition);
+            if (simpleMatch != null) {
+              filename = simpleMatch.group(1) ?? filename;
+            }
+          }
+
+          // Apply Unicode decoding to handle special characters properly
+          filename = _decodeFilename(filename);
+        } else {
+          debugPrint('📥 No Content-Disposition header found!');
+        }
+        debugPrint('📥 Final decoded filename: $filename');
+
+        if (kIsWeb) {
+          // Web download - direct file streaming with proper MIME type
+          final bytes = response.bodyBytes;
+          final mimeType =
+              response.headers['content-type'] ?? 'application/octet-stream';
+
+          debugPrint('📥 Creating blob with MIME type: $mimeType');
+          debugPrint('📥 File size: ${bytes.length} bytes');
+
+          // Create blob with explicit MIME type
+          final blob = html.Blob([bytes], mimeType);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+
+          // Force download by using attachment disposition
+          final anchor = html.document.createElement('a') as html.AnchorElement
+            ..href = url
+            ..style.display = 'none'
+            ..download = filename
+            ..setAttribute('type', mimeType);
+
+          html.document.body!.children.add(anchor);
+          anchor.click();
+          html.document.body!.children.remove(anchor);
+          html.Url.revokeObjectUrl(url);
+
+          debugPrint('📥 === DOWNLOAD SUCCESS ===');
+          debugPrint('📥 File downloaded: $filename (${bytes.length} bytes)');
+          _showSnackBar('File downloaded successfully: $filename');
+        } else {
+          _showSnackBar('Download feature available on web only');
+        }
       } else {
-        _showSnackBar('Download feature available on web only');
+        throw Exception('Download failed: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('📥 === DOWNLOAD ERROR ===');
       debugPrint('📥 Exception: $e');
-      _showSnackBar('Failed to download PDF: $e', isError: true);
+      _showSnackBar('Failed to download file: $e', isError: true);
     }
   }
 
-  Future<void> _addSampleTransaction() async {
-    if (_dbService.isDemoMode) {
-      _showSnackBar(
-          'Cannot add transactions in demo mode. Create a real company first.',
-          isError: true);
-      return;
-    }
-
+  Future<void> _deletePDF(String attachmentId, String filename) async {
     try {
-      debugPrint('💰 === ADDING SAMPLE TRANSACTION ===');
+      debugPrint('🗑️ === DELETE ATTACHMENT ===');
+      debugPrint('🗑️ Attachment ID: $attachmentId');
+      debugPrint('🗑️ Filename: $filename');
 
-      final invoice = Invoice(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        invoiceNumber:
-            'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        clientName:
-            'Sample Client ${DateTime.now().hour}:${DateTime.now().minute}',
-        amount:
-            (500 + (DateTime.now().millisecondsSinceEpoch % 2000)).toDouble(),
-        date: DateTime.now(),
-        dueDate: DateTime.now().add(const Duration(days: 30)),
-        status: 'Pending',
-        description: 'Sample invoice created from dashboard',
-        createdAt: DateTime.now(),
+      // Show confirmation dialog
+      bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Delete Attachment'),
+            content: Text(
+                'Are you sure you want to delete "$filename"?\n\nThis action cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
       );
 
-      await _dbService.insertInvoice(invoice);
+      if (confirmed != true) {
+        debugPrint('🗑️ Delete cancelled by user');
+        return;
+      }
 
-      _showSnackBar('Sample invoice created successfully!');
+      await _dbService.deleteAttachment(attachmentId);
 
-      // Reload dashboard data
-      await _loadDashboardData();
+      debugPrint('🗑️ Attachment deleted successfully');
+      _showSnackBar('Attachment "$filename" deleted successfully!');
+
+      // Close the PDF viewer dialog and refresh attachments
+      if (mounted) {
+        Navigator.of(context).pop();
+        // Optionally refresh the dashboard data
+        await _loadDashboardData();
+      }
     } catch (e) {
-      debugPrint('💰 === TRANSACTION ERROR ===');
-      debugPrint('💰 Error: $e');
-      _showSnackBar('Failed to create transaction: $e', isError: true);
+      debugPrint('🗑️ === DELETE ERROR ===');
+      debugPrint('🗑️ Exception: $e');
+      _showSnackBar('Failed to delete attachment: $e', isError: true);
     }
   }
 
@@ -546,6 +762,59 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
+          // Add Invoice button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddInvoiceDialog(),
+            icon: Icon(
+              Icons.receipt_long,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Invoice',
+          ),
+          // Add Expense button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddExpenseDialog(),
+            icon: Icon(
+              Icons.money_off,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Expense',
+          ),
+          // Add Payroll button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddPayrollDialog(),
+            icon: Icon(
+              Icons.person,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Payroll',
+          ),
+          // Add Bank Statement button
+          IconButton(
+            onPressed: _dbService.isDemoMode
+                ? () => _showSnackBar(
+                    'Demo mode - Create a real company to add transactions',
+                    isError: true)
+                : () => _showAddBankStatementDialog(),
+            icon: Icon(
+              Icons.account_balance,
+              color: isDemoMode ? Colors.orange : Colors.blue,
+            ),
+            tooltip: 'Add Bank Statement',
+          ),
+          const SizedBox(width: 8),
           // Company info button
           IconButton(
             onPressed: () => _showCompanyInfo(),
@@ -553,19 +822,7 @@ class _HomePageState extends State<HomePage> {
               Icons.info_outline,
               color: isDemoMode ? Colors.orange : Colors.blue,
             ),
-          ),
-          // Period selector
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'This Month',
-              style: TextStyle(fontSize: 12),
-            ),
+            tooltip: 'Company Info',
           ),
           // User profile
           Padding(
@@ -608,12 +865,7 @@ class _HomePageState extends State<HomePage> {
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
               ? _buildErrorView()
-              : Stack(
-                  children: [
-                    _buildDashboard(),
-                    _buildCustomFloatingAction(),
-                  ],
-                ),
+              : _buildDashboard(),
     );
   }
 
@@ -667,13 +919,13 @@ class _HomePageState extends State<HomePage> {
               color: Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // Metrics cards
+          // Metrics cards with adjusted height
           _buildMetricsCards(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
-          // Data tabs
+          // Horizontal data tabs
           _buildDataTabs(),
           const SizedBox(height: 16),
 
@@ -766,21 +1018,21 @@ class _HomePageState extends State<HomePage> {
     final metrics = [
       {
         'title': 'Total Income',
-        'value': '\$${totalIncome.toStringAsFixed(2)}',
+        'value': '${_getCurrencySymbol()}${totalIncome.toStringAsFixed(2)}',
         'change': '+$totalInvoices invoices',
         'icon': Icons.trending_up,
         'color': Colors.green,
       },
       {
         'title': 'Total Expenses',
-        'value': '\$${totalExpenses.toStringAsFixed(2)}',
+        'value': '${_getCurrencySymbol()}${totalExpenses.toStringAsFixed(2)}',
         'change': '+${_expenses.length} expenses',
         'icon': Icons.trending_down,
         'color': Colors.red,
       },
       {
         'title': 'Net Profit',
-        'value': '\$${netProfit.toStringAsFixed(2)}',
+        'value': '${_getCurrencySymbol()}${netProfit.toStringAsFixed(2)}',
         'change': netProfit >= 0 ? 'Profit' : 'Loss',
         'icon': Icons.account_balance_wallet,
         'color': netProfit >= 0 ? Colors.blue : Colors.red,
@@ -799,7 +1051,7 @@ class _HomePageState extends State<HomePage> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        childAspectRatio: 1.2,
+        childAspectRatio: 2.6, // Reduced height - twice less than before
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -953,8 +1205,19 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             TextButton.icon(
-              onPressed: () =>
-                  _showSnackBar('View all invoices feature coming soon!'),
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const InvoicesPage(),
+                  ),
+                );
+                // If invoices were modified, refresh dashboard
+                if (result == true) {
+                  print(
+                      '🔄 [HomePage] Invoices were modified, refreshing dashboard...');
+                  await _loadDashboardData();
+                }
+              },
               icon: const Icon(Icons.visibility, size: 16),
               label: const Text('View All'),
             ),
@@ -966,6 +1229,166 @@ class _HomePageState extends State<HomePage> {
             .map((invoice) => _buildInvoiceCard(invoice))
             .toList(),
       ],
+    );
+  }
+
+  Widget _buildExpensesList() {
+    if (_expenses.isEmpty) {
+      return _buildEmptyState(
+          'No expenses found', 'Track your first expense to get started');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Expenses (${_expenses.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ExpensesPage(),
+                  ),
+                );
+                // If expenses were modified, refresh dashboard
+                if (result == true) {
+                  print(
+                      '🔄 [HomePage] Expenses were modified, refreshing dashboard...');
+                  await _loadDashboardData();
+                }
+              },
+              icon: const Icon(Icons.visibility, size: 16),
+              label: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._expenses
+            .take(5)
+            .map((expense) => _buildExpenseCard(expense))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildPayrollList() {
+    if (_payrollEntries.isEmpty) {
+      return _buildEmptyState(
+          'No payroll entries found', 'Add your first payroll entry');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Payroll (${_payrollEntries.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PayrollPage(),
+                ),
+              ),
+              icon: const Icon(Icons.visibility, size: 16),
+              label: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._payrollEntries
+            .take(5)
+            .map((entry) => _buildPayrollCard(entry))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildBankStatementsList() {
+    if (_bankStatements.isEmpty) {
+      return _buildEmptyState(
+          'No bank statements found', 'Import your first bank statement');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Bank Statements (${_bankStatements.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const BankStatementsPage(),
+                ),
+              ),
+              icon: const Icon(Icons.visibility, size: 16),
+              label: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._bankStatements
+            .take(5)
+            .map((statement) => _buildBankStatementCard(statement))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1018,7 +1441,7 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '\$${invoice.amount.toStringAsFixed(2)}',
+                '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1084,32 +1507,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildExpensesList() {
-    if (_expenses.isEmpty) {
-      return _buildEmptyState(
-          'No expenses found', 'Track your first expense to get started');
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recent Expenses (${_expenses.length})',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ..._expenses
-            .take(5)
-            .map((expense) => _buildExpenseCard(expense))
-            .toList(),
-      ],
-    );
-  }
-
   Widget _buildExpenseCard(Expense expense) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1158,7 +1555,7 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Text(
-                '\$${expense.amount.toStringAsFixed(2)}',
+                '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1201,18 +1598,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPayrollList() {
-    if (_payrollEntries.isEmpty) {
-      return _buildEmptyState(
-          'No payroll entries found', 'Add your first payroll entry');
-    }
-
-    return Column(
-      children:
-          _payrollEntries.map((entry) => _buildPayrollCard(entry)).toList(),
     );
   }
 
@@ -1264,7 +1649,7 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Text(
-                '\$${entry.netPay.toStringAsFixed(2)}',
+                '${_getCurrencySymbol()}${entry.netPay.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1306,19 +1691,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBankStatementsList() {
-    if (_bankStatements.isEmpty) {
-      return _buildEmptyState(
-          'No bank statements found', 'Import your first bank statement');
-    }
-
-    return Column(
-      children: _bankStatements
-          .map((statement) => _buildBankStatementCard(statement))
-          .toList(),
     );
   }
 
@@ -1373,7 +1745,7 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isCredit ? '+' : ''}\$${statement.amount.abs().toStringAsFixed(2)}',
+                '${isCredit ? '+' : ''}${_getCurrencySymbol()}${statement.amount.abs().toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1384,7 +1756,7 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Bal: \$${statement.balance.toStringAsFixed(2)}',
+                    'Bal: ${_getCurrencySymbol()}${statement.balance.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.grey[600],
@@ -1570,70 +1942,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildEmptyState(String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomFloatingAction() {
-    return Positioned(
-      right: 20,
-      bottom: 100, // Position higher to avoid overlap with list items
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          heroTag: "home_custom_fab",
-          onPressed: _dbService.isDemoMode
-              ? () => _showSnackBar(
-                  'Demo mode - Create a real company to add transactions',
-                  isError: true)
-              : _showAddDialog,
-          backgroundColor: _dbService.isDemoMode ? Colors.orange : Colors.blue,
-          child: Icon(
-            _dbService.isDemoMode ? Icons.preview : Icons.add,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showCompanyInfo() {
     showDialog(
       context: context,
@@ -1657,11 +1965,11 @@ class _HomePageState extends State<HomePage> {
             const Text('Financial Summary:',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             Text(
-                'Total Income: \$${(_metrics['invoices']?['total_invoice_amount'] ?? 0).toStringAsFixed(2)}'),
+                'Total Income: ${_getCurrencySymbol()}${(_metrics['invoices']?['total_invoice_amount'] ?? 0).toStringAsFixed(2)}'),
             Text(
-                'Total Expenses: \$${(_metrics['expenses']?['total_expense_amount'] ?? 0).toStringAsFixed(2)}'),
+                'Total Expenses: ${_getCurrencySymbol()}${(_metrics['expenses']?['total_expense_amount'] ?? 0).toStringAsFixed(2)}'),
             Text(
-                'Net Profit: \$${(_metrics['net_profit'] ?? 0).toStringAsFixed(2)}'),
+                'Net Profit: ${_getCurrencySymbol()}${(_metrics['net_profit'] ?? 0).toStringAsFixed(2)}'),
           ],
         ),
         actions: [

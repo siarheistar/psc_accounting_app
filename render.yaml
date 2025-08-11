@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: psc-accounting-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: backend/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      # Set your allowed frontend origins (comma-separated) in Render Dashboard
+      # Example: https://yourapp.web.app, https://yourapp.firebaseapp.com
+      - key: ALLOWED_ORIGINS
+        sync: false

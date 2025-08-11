@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 
 class AddExpenseDialog extends StatefulWidget {
   const AddExpenseDialog({super.key});
@@ -35,6 +36,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
   ];
 
   bool _isLoading = true;
+  bool _isSaving = false; // Add saving state to prevent double submission
 
   @override
   void initState() {
@@ -55,6 +57,14 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     } else {
       debugPrint('💰 AddExpenseDialog: No company context available');
     }
+  }
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
   }
 
   @override
@@ -99,6 +109,13 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
   }
 
   Future<void> _saveExpense() async {
+    // Prevent double submission
+    if (_isSaving) {
+      debugPrint(
+          '💰 [AddExpenseDialog] Save already in progress, ignoring duplicate request');
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCategory == null) {
@@ -106,7 +123,10 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isSaving = true;
+    });
 
     try {
       final expense = Expense(
@@ -121,7 +141,9 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
             : _notesController.text.trim(),
       );
 
+      debugPrint('💰 [AddExpenseDialog] Starting expense save...');
       await _dbService.insertExpense(expense);
+      debugPrint('💰 [AddExpenseDialog] Expense save completed successfully');
 
       if (mounted) {
         Navigator.of(context).pop(expense);
@@ -133,6 +155,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
         );
       }
     } catch (e) {
+      debugPrint('💰 [AddExpenseDialog] Error saving expense: $e');
       if (mounted) {
         // Show detailed error dialog instead of snackbar
         showDialog(
@@ -183,7 +206,12 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -277,11 +305,11 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                             // Amount
                             TextFormField(
                               controller: _amountController,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Amount',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.attach_money),
-                                prefixText: '\$',
+                                border: const OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.attach_money),
+                                prefixText: _getCurrencySymbol(),
                               ),
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -367,14 +395,25 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed: _saveExpense,
+                          onPressed: _isSaving
+                              ? null
+                              : _saveExpense, // Disable when saving
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFEF4444),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 24, vertical: 12),
                           ),
-                          child: const Text('Save Expense'),
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Save Expense'),
                         ),
                       ],
                     ),

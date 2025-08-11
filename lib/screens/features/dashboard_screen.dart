@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../context/simple_company_context.dart';
 import '../../services/api_service.dart';
 import '../../services/refresh_notifier.dart';
+import '../../utils/currency_utils.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -71,6 +72,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    return CurrencyUtils.getCurrencySymbol(selectedCompany?.currency);
+  }
+
   Future<void> _showCreateInvoiceDialog() async {
     final selectedCompany = SimpleCompanyContext.selectedCompany;
     if (selectedCompany == null) return;
@@ -96,10 +102,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Amount',
                 hintText: 'Enter amount',
-                prefixText: '\$',
+                prefixText: '${_getCurrencySymbol()} ',
               ),
               keyboardType: TextInputType.number,
             ),
@@ -189,10 +195,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Amount',
                 hintText: 'Enter amount',
-                prefixText: '\$',
+                prefixText: '${_getCurrencySymbol()} ',
               ),
               keyboardType: TextInputType.number,
             ),
@@ -380,7 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   '${_dashboardData['totalInvoices'] ?? 0}',
                   Icons.receipt_long,
                   Colors.blue,
-                  '\$${(_dashboardData['totalInvoiceAmount'] ?? 0.0).toStringAsFixed(2)}',
+                  '${_getCurrencySymbol()}${(_dashboardData['totalInvoiceAmount'] ?? 0.0).toStringAsFixed(2)}',
                   onTap: () => _navigateToTab(1), // Navigate to invoices
                 ),
                 _buildStatCard(
@@ -389,7 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   '${_dashboardData['totalExpenses'] ?? 0}',
                   Icons.shopping_cart,
                   Colors.green,
-                  '\$${(_dashboardData['totalExpenseAmount'] ?? 0.0).toStringAsFixed(2)}',
+                  '${_getCurrencySymbol()}${(_dashboardData['totalExpenseAmount'] ?? 0.0).toStringAsFixed(2)}',
                   onTap: () => _navigateToTab(2), // Navigate to expenses
                 ),
                 _buildStatCard(
@@ -398,7 +404,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   '${_dashboardData['pendingInvoices'] ?? 0}',
                   Icons.schedule,
                   Colors.orange,
-                  '\$${(_dashboardData['pendingAmount'] ?? 0.0).toStringAsFixed(2)}',
+                  '${_getCurrencySymbol()}${(_dashboardData['pendingAmount'] ?? 0.0).toStringAsFixed(2)}',
                   onTap: () => _navigateToTab(1), // Navigate to invoices
                 ),
                 _buildStatCard(

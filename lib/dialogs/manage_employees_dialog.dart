@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/accounting_models.dart';
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
+import '../utils/currency_utils.dart';
 import 'add_employee_dialog.dart';
 import 'edit_employee_dialog.dart';
 
@@ -17,6 +18,14 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
   List<Employee> _employees = [];
   bool _isLoading = true;
   String? _error;
+
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency);
+    }
+    return '€'; // Default to Euro
+  }
 
   @override
   void initState() {
@@ -72,6 +81,15 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
   }
 
   Future<void> _editEmployee(Employee employee) async {
+    // Check if this is a payroll-derived employee (read-only)
+    if (employee.id.startsWith('payroll_')) {
+      _showSnackBar(
+        'Payroll employees cannot be edited. Create a new employee record instead.',
+        isError: true,
+      );
+      return;
+    }
+
     final updatedEmployee = await showDialog<Employee>(
       context: context,
       builder: (context) => EditEmployeeDialog(employee: employee),
@@ -253,7 +271,7 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                           Text('Email: ${employee.email}'),
                                         if (employee.baseSalary != null)
                                           Text(
-                                              'Base Salary: \$${employee.baseSalary!.toStringAsFixed(2)}'),
+                                              'Base Salary: ${_getCurrencySymbol()}${employee.baseSalary!.toStringAsFixed(2)}'),
                                       ],
                                     ),
                                     trailing: Row(
@@ -277,6 +295,26 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                               ),
                                             ),
                                           ),
+                                        if (employee.id.startsWith('payroll_'))
+                                          Container(
+                                            margin:
+                                                const EdgeInsets.only(left: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Text(
+                                              'PAYROLL',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                         const SizedBox(width: 8),
                                         PopupMenuButton<String>(
                                           onSelected: (value) {
@@ -289,26 +327,57 @@ class _ManageEmployeesDialogState extends State<ManageEmployeesDialog> {
                                                 break;
                                             }
                                           },
-                                          itemBuilder: (context) => [
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: ListTile(
-                                                leading: Icon(Icons.edit,
-                                                    color: Colors.blue),
-                                                title: Text('Edit'),
-                                                contentPadding: EdgeInsets.zero,
+                                          itemBuilder: (context) {
+                                            final isPayrollEmployee = employee
+                                                .id
+                                                .startsWith('payroll_');
+                                            return [
+                                              PopupMenuItem(
+                                                value: 'edit',
+                                                enabled: !isPayrollEmployee,
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons.edit,
+                                                    color: isPayrollEmployee
+                                                        ? Colors.grey
+                                                        : Colors.blue,
+                                                  ),
+                                                  title: Text(
+                                                    'Edit',
+                                                    style: TextStyle(
+                                                      color: isPayrollEmployee
+                                                          ? Colors.grey
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  contentPadding:
+                                                      EdgeInsets.zero,
+                                                ),
                                               ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: ListTile(
-                                                leading: Icon(Icons.delete,
-                                                    color: Colors.red),
-                                                title: Text('Delete'),
-                                                contentPadding: EdgeInsets.zero,
+                                              PopupMenuItem(
+                                                value: 'delete',
+                                                enabled: !isPayrollEmployee,
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons.delete,
+                                                    color: isPayrollEmployee
+                                                        ? Colors.grey
+                                                        : Colors.red,
+                                                  ),
+                                                  title: Text(
+                                                    'Delete',
+                                                    style: TextStyle(
+                                                      color: isPayrollEmployee
+                                                          ? Colors.grey
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  contentPadding:
+                                                      EdgeInsets.zero,
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ];
+                                          },
                                         ),
                                       ],
                                     ),

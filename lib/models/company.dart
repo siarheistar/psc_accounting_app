@@ -7,6 +7,9 @@ class Company {
   final String ownerEmail;
   final DateTime createdAt;
   final bool isDemo;
+  final String? country;
+  final String? currency;
+  final String? vatNumber;
 
   Company({
     required this.id,
@@ -17,6 +20,9 @@ class Company {
     required this.ownerEmail,
     required this.createdAt,
     required this.isDemo,
+    this.country,
+    this.currency,
+    this.vatNumber,
   });
 
   factory Company.fromJson(Map<String, dynamic> json) {
@@ -30,6 +36,9 @@ class Company {
       createdAt: DateTime.parse(
           json['created_at'] ?? DateTime.now().toIso8601String()),
       isDemo: json['is_demo'] ?? false,
+      country: json['country'],
+      currency: json['currency'],
+      vatNumber: json['vat_number'],
     );
   }
 
@@ -43,6 +52,9 @@ class Company {
       'owner_email': ownerEmail,
       'created_at': createdAt.toIso8601String(),
       'is_demo': isDemo,
+      'country': country,
+      'currency': currency,
+      'vat_number': vatNumber,
     };
   }
 

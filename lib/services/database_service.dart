@@ -1,28 +1,27 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
-import '../models/accounting_models.dart';
-import '../screens/company_creation_page.dart';
 import 'package:flutter/foundation.dart';
+import 'api_service.dart';
+import '../models/accounting_models.dart';
+// Removed unused and duplicate imports
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DatabaseService {
-  // Your PostgreSQL connection details
-  static const String _host = 'pscdb.cnacsqi4u8qw.eu-west-1.rds.amazonaws.com';
-  static const String _port = '5432';
-  static const String _database = 'pscdb';
-  static const String _username = 'postgres';
+  // Database connection details are now handled by the backend API
+  // The Flutter frontend does not need direct database credentials
+  // All database operations go through the secure backend API
 
   // For production, deploy the backend API and use that URL
   // For development, we need to handle Flutter web's specific requirements
   static String get _baseUrl {
     if (kIsWeb) {
-      // For Flutter web, backend API is on port 8000 (no /api prefix)
-      return 'http://localhost:8000';
+      // For Flutter web, use centralized API base URL (overridable via --dart-define)
+      return ApiService.baseUrl;
     } else {
-      // For mobile emulator
-      return 'http://10.0.2.2:8000';
+      // For mobile emulator; allow override via dart-define API_BASE_URL
+      return const String.fromEnvironment('API_BASE_URL',
+          defaultValue: 'http://10.0.2.2:8000');
     }
   }
 
@@ -1351,9 +1350,14 @@ class DatabaseService {
     }
 
     try {
+      // Build URL correctly with attachment ID in path and company_id as query param
+      String baseUrl = _isDemoMode
+          ? '$_baseUrl/demo/attachments/$attachmentId'
+          : '$_baseUrl/attachments/$attachmentId?company_id=$_currentCompanyId';
+
       final response = await http
           .delete(
-            Uri.parse('${_buildUrl('attachments')}/$attachmentId'),
+            Uri.parse(baseUrl),
             headers: _headers,
           )
           .timeout(const Duration(seconds: 30));
@@ -1398,27 +1402,68 @@ class DatabaseService {
           '📥 Download response body length: ${downloadResponse.body.length}');
 
       if (downloadResponse.statusCode == 200) {
-        final downloadData = jsonDecode(downloadResponse.body);
-        debugPrint('📥 Download response keys: ${downloadData.keys.toList()}');
+        // Check content type to determine response format
+        final contentType = downloadResponse.headers['content-type'] ?? '';
 
-        if (downloadData['file_data'] != null &&
-            downloadData['file_data'].toString().isNotEmpty &&
-            downloadData['file_data'] != 'null') {
-          debugPrint('📥 === USING BACKEND DOWNLOAD DATA ===');
-          debugPrint('📥 File: ${downloadData['filename']}');
-          debugPrint('📥 Size: ${downloadData['file_size']} bytes');
+        if (contentType.startsWith('application/json')) {
+          // Old format: JSON response with base64 data
+          debugPrint('📥 === LEGACY JSON RESPONSE FORMAT ===');
+          final downloadData = jsonDecode(downloadResponse.body);
           debugPrint(
-              '📥 Base64 length: ${downloadData['file_data'].toString().length} characters');
+              '📥 Download response keys: ${downloadData.keys.toList()}');
 
-          return await _deserializeBase64Data(
-              downloadData['file_data'].toString(),
-              downloadData['filename'] ?? 'document.pdf',
-              downloadData['mime_type'] ?? 'application/pdf',
-              documentId);
+          if (downloadData['file_data'] != null &&
+              downloadData['file_data'].toString().isNotEmpty &&
+              downloadData['file_data'] != 'null') {
+            debugPrint('📥 === USING BACKEND DOWNLOAD DATA ===');
+            debugPrint('📥 File: ${downloadData['filename']}');
+            debugPrint('📥 Size: ${downloadData['file_size']} bytes');
+            debugPrint(
+                '📥 Base64 length: ${downloadData['file_data'].toString().length} characters');
+
+            return await _deserializeBase64Data(
+                downloadData['file_data'].toString(),
+                downloadData['filename'] ?? 'document.pdf',
+                downloadData['mime_type'] ?? 'application/pdf',
+                documentId);
+          } else {
+            debugPrint(
+                '📥 Backend download endpoint returned no file_data or null');
+            debugPrint('📥 Response data: $downloadData');
+          }
         } else {
+          // New format: Direct file content
+          debugPrint('📥 === NEW STREAMING RESPONSE FORMAT ===');
+          debugPrint('📥 Content-Type: $contentType');
+
+          // Extract filename from Content-Disposition header
+          final contentDisposition =
+              downloadResponse.headers['content-disposition'] ?? '';
+          String filename = 'document.pdf';
+          if (contentDisposition.isNotEmpty) {
+            // Handle both quoted and unquoted filenames, and clean up any newlines
+            final cleanDisposition =
+                contentDisposition.replaceAll('\n', '').replaceAll('\r', '');
+            final match = RegExp(r'filename[*]?=(?:"([^"]+)"|([^;\s]+))')
+                .firstMatch(cleanDisposition);
+            if (match != null) {
+              filename =
+                  (match.group(1) ?? match.group(2))?.trim() ?? 'document.pdf';
+            }
+          }
+
+          debugPrint('📥 Extracted filename: $filename');
           debugPrint(
-              '📥 Backend download endpoint returned no file_data or null');
-          debugPrint('📥 Response data: $downloadData');
+              '📥 File size: ${downloadResponse.bodyBytes.length} bytes');
+
+          // Return the file data directly
+          final base64Data = base64Encode(downloadResponse.bodyBytes);
+          return {
+            'filename': filename,
+            'file_data': base64Data,
+            'mime_type': contentType,
+            'file_size': downloadResponse.bodyBytes.length,
+          };
         }
       } else {
         debugPrint(

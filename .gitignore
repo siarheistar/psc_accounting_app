@@ -56,7 +56,21 @@ __pycache__/
 venv/
 env/
 ENV/
+
+# Environment variables and secrets
 .env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.*.local
+*.env
+backend/.env
+backend/.env.*
+backend/.env.backup.*
+!.env.example
+!backend/.env.example
+!**/*.env.example
 
 # Node.js
 node_modules/
@@ -68,6 +82,24 @@ yarn-error.log*
 *.db
 *.sqlite
 *.sqlite3
+
+# Service account keys and credentials
+**/service-account*.json
+**/google-credentials*.json
+**/firebase-credentials*.json
+**/*-key.json
+**/*-credentials.json
+
+# SSL/TLS certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Backup files with potential secrets
+*.backup
+*.bak
+*-backup.*
 
 # Logs
 logs/

@@ -3,7 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000'; // FastAPI backend URL
+  // Backend URL, overridable at build time:
+  // flutter run -d chrome --dart-define=API_BASE_URL=https://your-backend.onrender.com
+  // flutter build web --dart-define=API_BASE_URL=https://your-backend.onrender.com
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8000',
+  );
 
   // Invoice methods
   static Future<List<Map<String, dynamic>>> getInvoices(
@@ -177,13 +183,29 @@ class ApiService {
   static Future<Map<String, dynamic>> createCompany(
       Map<String, dynamic> company) async {
     print('🏢 [ApiService] Creating company with data: $company');
-    print('🌐 [ApiService] Sending POST request to: $baseUrl/companies');
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/companies'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(company),
-    );
+    // Build query parameters as the backend expects them
+    final queryParams = <String, String>{
+      'name': company['name']?.toString() ?? '',
+      'owner_email': company['owner_email']?.toString() ?? '',
+    };
+
+    // Add optional parameters if they exist
+    if (company['vat_number'] != null) {
+      queryParams['vat_number'] = company['vat_number'].toString();
+    }
+    if (company['country'] != null) {
+      queryParams['country'] = company['country'].toString();
+    }
+    if (company['currency'] != null) {
+      queryParams['currency'] = company['currency'].toString();
+    }
+
+    final uri =
+        Uri.parse('$baseUrl/companies').replace(queryParameters: queryParams);
+    print('🌐 [ApiService] Sending POST request to: $uri');
+
+    final response = await http.post(uri);
 
     print('📡 [ApiService] Response status: ${response.statusCode}');
     print('📋 [ApiService] Response body: ${response.body}');
@@ -196,6 +218,33 @@ class ApiService {
       print(
           '❌ [ApiService] Failed to create company - Status: ${response.statusCode}, Body: ${response.body}');
       throw Exception('Failed to create company');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateCompany(
+      String companyId, Map<String, dynamic> company) async {
+    print('🏢 [ApiService] Updating company $companyId with data: $company');
+
+    final uri = Uri.parse('$baseUrl/companies/$companyId');
+    print('🌐 [ApiService] Sending PUT request to: $uri');
+
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(company),
+    );
+
+    print('📡 [ApiService] Response status: ${response.statusCode}');
+    print('📋 [ApiService] Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+      print('✅ [ApiService] Company updated successfully: $result');
+      return result;
+    } else {
+      print(
+          '❌ [ApiService] Failed to update company - Status: ${response.statusCode}, Body: ${response.body}');
+      throw Exception('Failed to update company: ${response.body}');
     }
   }
 

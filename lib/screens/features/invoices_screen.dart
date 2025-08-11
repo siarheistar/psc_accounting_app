@@ -5,6 +5,7 @@ import '../../context/simple_company_context.dart';
 import '../../services/refresh_notifier.dart';
 import '../../models/accounting_models.dart';
 import '../../dialogs/edit_invoice_dialog.dart';
+import '../../utils/currency_utils.dart';
 
 class InvoicesScreen extends StatefulWidget {
   const InvoicesScreen({super.key});
@@ -68,6 +69,14 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     }
   }
 
+  String _getCurrencySymbol() {
+    final selectedCompany = SimpleCompanyContext.selectedCompany;
+    if (selectedCompany?.currency != null) {
+      return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
+    }
+    return '\$'; // Default fallback
+  }
+
   Future<void> _createInvoice() async {
     final selectedCompany = SimpleCompanyContext.selectedCompany;
     if (selectedCompany == null) return;
@@ -93,10 +102,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Amount',
                 hintText: 'Enter amount',
-                prefixText: '\$',
+                prefixText: _getCurrencySymbol(),
               ),
               keyboardType: TextInputType.number,
             ),
@@ -242,7 +251,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             const Text('Are you sure you want to delete this invoice?'),
             const SizedBox(height: 8),
             Text('Client: ${invoice['client_name'] ?? 'N/A'}'),
-            Text('Amount: \$${invoice['amount'] ?? 0}'),
+            Text('Amount: ${_getCurrencySymbol()}${invoice['amount'] ?? 0}'),
             Text('Date: ${invoice['date'] ?? 'N/A'}'),
             Text('Status: ${invoice['status'] ?? 'N/A'}'),
             const SizedBox(height: 8),
@@ -402,18 +411,33 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                                     color: Colors.white,
                                   ),
                                 ),
-                                title: Text(
-                                  'Client: ${invoice['client_name']}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                title: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      invoice['invoice_number'] ?? 'N/A',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.deepPurple,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Client: ${invoice['client_name']}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 4),
                                     Text('Date: ${invoice['date']}'),
-                                    Text('Amount: \$${invoice['amount']}'),
+                                    Text(
+                                        'Amount: ${_getCurrencySymbol()}${invoice['amount']}'),
                                     const SizedBox(height: 4),
                                     Container(
                                       padding: const EdgeInsets.symmetric(

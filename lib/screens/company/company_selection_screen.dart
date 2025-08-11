@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/api_service.dart';
 import '../../models/company.dart';
 import '../../context/simple_company_context.dart';
+import '../../dialogs/create_company_dialog.dart';
 
 class CompanySelectionScreen extends StatefulWidget {
   final Function(Company) onCompanySelected;
@@ -58,119 +59,20 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
   }
 
   Future<void> _showCreateCompanyDialog() async {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController addressController = TextEditingController();
-    final TextEditingController phoneController = TextEditingController();
-    final TextEditingController emailController = TextEditingController();
-
-    final result = await showDialog<Company>(
+    final newCompany = await showDialog<Company>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Create New Company'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Company Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Company name is required')),
-                  );
-                  return;
-                }
-
-                try {
-                  final user = FirebaseAuth.instance.currentUser;
-                  if (user != null) {
-                    print(
-                        '🏢 [CompanySelection] Creating company for user: ${user.email}');
-
-                    final companyData = {
-                      'name': nameController.text.trim(),
-                      'address': addressController.text.trim(),
-                      'phone': phoneController.text.trim(),
-                      'email': emailController.text.trim(),
-                      'owner_email': user.email!,
-                    };
-
-                    print(
-                        '📋 [CompanySelection] Company data prepared: $companyData');
-
-                    final newCompanyData =
-                        await ApiService.createCompany(companyData);
-
-                    print(
-                        '✅ [CompanySelection] Company created, received data: $newCompanyData');
-
-                    final newCompany = Company.fromJson(newCompanyData);
-
-                    print(
-                        '🎉 [CompanySelection] Company object created: ${newCompany.toString()}');
-
-                    Navigator.of(context).pop(newCompany);
-                  } else {
-                    print('❌ [CompanySelection] No authenticated user found');
-                  }
-                } catch (e) {
-                  print('💥 [CompanySelection] Error creating company: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to create company: $e')),
-                  );
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
+      builder: (BuildContext context) => const CreateCompanyDialog(),
     );
 
-    if (result != null) {
+    if (newCompany != null) {
+      // Add the new company to the list and refresh
       setState(() {
-        companies.add(result);
+        companies.add(newCompany);
       });
+
+      // Auto-select the new company
+      SimpleCompanyContext.setSelectedCompany(newCompany);
+      widget.onCompanySelected(newCompany);
     }
   }
 
