@@ -3,9 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../context/simple_company_context.dart';
 import '../../services/navigation_manager.dart';
 import '../../pages/home_page.dart';
-import '../features/invoices_screen.dart';
-import '../features/expenses_screen.dart';
-import '../../dialogs/manage_employees_dialog.dart';
+// Removed Invoices and Expenses tabs from bottom navigation
 import '../admin/admin_screen.dart';
 
 class MainHomeScreen extends StatefulWidget {
@@ -25,8 +23,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
     _pages = [
       const HomePage(),
-      InvoicesScreen(),
-      ExpensesScreen(),
     ];
 
     // Restore the last selected tab from browser storage with bounds checking
@@ -172,26 +168,29 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         index: _selectedIndex,
         children: _pages,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt),
-            label: 'Invoices',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Expenses',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blue,
-        onTap: _onItemTapped,
-      ),
+      // Hide bottom nav if fewer than 2 tabs (Flutter requires >= 2 items)
+      bottomNavigationBar: _pages.length >= 2
+          ? BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              items: const <BottomNavigationBarItem>[
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.receipt),
+                  label: 'Invoices',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.shopping_cart),
+                  label: 'Expenses',
+                ),
+              ],
+              currentIndex: _selectedIndex,
+              selectedItemColor: Colors.blue,
+              onTap: _onItemTapped,
+            )
+          : null,
     );
   }
 }
