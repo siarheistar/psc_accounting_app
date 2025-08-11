@@ -19,6 +19,9 @@ from database import initialize_db_pool, close_db_pool, execute_query
 from attachment_manager import AttachmentManager
 import attachment_endpoints
 
+# Import environment configuration
+from env_config import env_config
+
 app = FastAPI(title="PSC Accounting API", version="1.0.0")
 
 # ================== GLOBAL VARIABLES ==================
@@ -56,6 +59,15 @@ attachment_manager = None
 async def startup_event():
     global attachment_manager
     print("🚀 [Backend] Starting PSC Accounting API...")
+    
+    # Validate environment configuration at startup
+    try:
+        env_config.validate_startup_requirements()
+        print("✅ [Backend] Environment configuration validated")
+    except SystemExit:
+        print("❌ [Backend] Environment validation failed - check your environment variables")
+        return
+    
     if initialize_db_pool():
         print("✅ [Backend] Database connection established")
     else:
