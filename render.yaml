@@ -12,3 +12,21 @@ services:
       # Comma-separated list of allowed frontend origins (no spaces, no trailing slashes)
       - key: ALLOWED_ORIGINS
         value: "https://psc-accounting-web.web.app,https://psc-accounting-web.firebaseapp.com,http://localhost:3000,http://127.0.0.1:3000"
+      # Database configuration (set values in Render Dashboard; kept unsynced from git)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_MODE
+        value: require
+      # Security secrets (production) - set in Render Dashboard; unsynced from git
+      - key: JWT_SECRET
+        sync: false
+      - key: API_SECRET_KEY
+        sync: false
