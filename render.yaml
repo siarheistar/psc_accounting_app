@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: psc-accounting-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: backend/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      # Comma-separated list of allowed frontend origins (no spaces, no trailing slashes)
+      - key: ALLOWED_ORIGINS
+        value: "https://psc-accounting-web.web.app,https://psc-accounting-web.firebaseapp.com,http://localhost:3000,http://127.0.0.1:3000"
+      # Database configuration (set values in Render Dashboard; kept unsynced from git)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_MODE
+        value: require
+      # Security secrets (production) - set in Render Dashboard; unsynced from git
+      - key: JWT_SECRET
+        sync: false
+      - key: API_SECRET_KEY
+        sync: false
+      # Optional: AWS Secrets Manager support (set in Render dashboard)
+      - key: AWS_REGION
+        value: eu-west-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_SECRETS_MANAGER_SECRET_ID
+        sync: false
