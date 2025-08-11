@@ -19,9 +19,6 @@ from database import initialize_db_pool, close_db_pool, execute_query
 from attachment_manager import AttachmentManager
 import attachment_endpoints
 
-# Import VAT system
-import vat_endpoints
-
 app = FastAPI(title="PSC Accounting API", version="1.0.0")
 
 # ================== GLOBAL VARIABLES ==================
@@ -80,16 +77,9 @@ async def shutdown_event():
     close_db_pool()
 
 # Enable CORS for Flutter app
-# Configure CORS from environment variable ALLOWED_ORIGINS (comma-separated)
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
-if allowed_origins_env.strip() == "*":
-    allowed_origins = ["*"]
-else:
-    allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"],  # In production, specify your Flutter app's origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -246,26 +236,14 @@ async def get_companies(owner_email: str = Query(..., description="Email of the 
         raise HTTPException(status_code=500, detail=f"Failed to get companies: {str(e)}")
 
 @app.post("/companies")
-async def create_company(company_data: dict):
+async def create_company(
+    name: str = Query(..., description="Company name"),
+    vat_number: Optional[str] = Query(None, description="VAT number"),
+    country: str = Query("Ireland", description="Country"),
+    currency: str = Query("EUR", description="Currency"),
+    owner_email: str = Query(..., description="Owner email")
+):
     """Create a new company"""
-    
-    # Validate required fields
-    if not company_data.get('name'):
-        raise HTTPException(status_code=400, detail="Company name is required")
-    
-    if not company_data.get('owner_email'):
-        raise HTTPException(status_code=400, detail="Owner email is required")
-    
-    name = company_data['name']
-    owner_email = company_data['owner_email']
-    vat_number = company_data.get('vat_number')
-    country = company_data.get('country', 'Ireland')
-    currency = company_data.get('currency', 'EUR')
-    phone = company_data.get('phone', '')
-    address = company_data.get('address', '')
-    subscription_plan = company_data.get('subscription_plan', 'free')
-    is_demo = company_data.get('is_demo', False)
-    status = company_data.get('status', 'active')
     
     print(f"🏢 [Backend] Creating company: {name} for {owner_email}")
     print(f"🏢 [Backend] Company details - VAT: {vat_number}, Country: {country}, Currency: {currency}")
@@ -277,61 +255,44 @@ async def create_company(company_data: dict):
         
         print(f"🏢 [Backend] Generated slug: {slug}")
         
-        # Create company in public.companies table with all fields
+        # Create company in public.companies table with integer IDs (consistent with existing system)
         company_query = """
-        INSERT INTO public.companies (name, slug, owner_email, phone, address, subscription_plan, is_demo, status, vat_number, country, currency, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-        RETURNING id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency
+        INSERT INTO public.companies (name, slug, owner_email, status, subscription_plan, is_demo, created_at)
+        VALUES (%s, %s, %s, 'active', 'free', false, NOW())
+        RETURNING id, name, slug, owner_email, status, subscription_plan, is_demo, created_at
         """
         
         print(f"🏢 [Backend] Executing company creation query...")
-        result = execute_query(company_query, (name, slug, owner_email, phone, address, subscription_plan, is_demo, status, vat_number, country, currency), fetch=True)
+        result = execute_query(company_query, (name, slug, owner_email), fetch=True)
         
         if not result:
             raise HTTPException(status_code=500, detail="Failed to create company")
         
         print(f"🏢 [Backend] Company creation result: {result}")
-        print(f"🏢 [Backend] Result type: {type(result)}")
-        print(f"🏢 [Backend] Result length: {len(result) if hasattr(result, '__len__') else 'No length'}")
         
-        # For INSERT with RETURNING, result might be an integer (ID only) or a tuple
-        # Let's handle both cases safely
-        if isinstance(result, int):
-            # Only ID returned - fetch the full record
-            get_query = "SELECT id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency FROM public.companies WHERE id = %s"
-            full_result = execute_query(get_query, (result,), fetch=True)
-            if full_result and len(full_result) > 0:
-                result_row = full_result[0]
-                # Convert dict to tuple in the expected order
-                result = (
-                    result_row['id'], result_row['name'], result_row['slug'], result_row['owner_email'],
-                    result_row['phone'], result_row['address'], result_row['subscription_plan'], 
-                    result_row['is_demo'], result_row['created_at'], result_row['status'], 
-                    result_row['vat_number'], result_row['country'], result_row['currency']
-                )
-            else:
-                raise HTTPException(status_code=500, detail="Failed to retrieve created company")
+        # Convert single row result to dict
+        row = dict(zip(['id', 'name', 'slug', 'owner_email', 'status', 'subscription_plan', 'is_demo', 'created_at'], result))
         
-        print(f"🏢 [Backend] Final result data: {result}")
+        print(f"🏢 [Backend] Company data row: {row}")
         
-        # Return response with all fields from database
+        # Return response with additional fields that frontend expects
         company = {
-            "id": str(result[0]),  # Convert to string for JSON response
-            "name": result[1],
-            "slug": result[2],
-            "owner_email": result[3],
-            "phone": result[4],
-            "address": result[5],
-            "subscription_plan": result[6],
-            "is_demo": result[7],
-            "created_at": result[8].isoformat() if result[8] else None,
-            "status": result[9],
-            "vat_number": result[10],
-            "country": result[11],
-            "currency": result[12]
+            "id": str(row['id']),  # Convert to string for JSON response, but it's an integer in DB
+            "name": row['name'],
+            "vat_number": vat_number,  # Include the VAT number from request
+            "country": country,  # Include country from request
+            "currency": currency,  # Include currency from request
+            "slug": row.get('slug'),
+            "owner_email": row['owner_email'], 
+            "phone": None,  # Not supported in current schema
+            "address": None,  # Not supported in current schema
+            "subscription_plan": row.get('subscription_plan', 'free'),
+            "is_demo": row.get('is_demo', False),
+            "status": row.get('status', 'active'),
+            "created_at": row['created_at'].isoformat() if row['created_at'] else None
         }
         
-        print(f"✅ [Backend] Created company with ID: {result[0]} (returned as string: {company['id']})")
+        print(f"✅ [Backend] Created company with integer ID: {row['id']} (returned as string: {company['id']})")
         return company
         
     except Exception as e:
@@ -428,80 +389,6 @@ async def update_company(
         print(f"❌ [Backend] Error updating company: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update company: {str(e)}")
 
-@app.get("/companies/{company_id}")
-async def get_company(company_id: str):
-    """Get a specific company by ID"""
-    try:
-        print(f"🔍 [Backend] Getting company with ID: {company_id}")
-        
-        query = """
-        SELECT id, name, slug, owner_email, phone, address, subscription_plan, is_demo, created_at, status, vat_number, country, currency
-        FROM public.companies 
-        WHERE id = %s
-        """
-        
-        result = execute_query(query, (int(company_id),), fetch=True)
-        
-        if result and len(result) > 0:
-            row = result[0]
-            company = {
-                "id": str(row['id']),
-                "name": row['name'],
-                "slug": row['slug'],
-                "owner_email": row['owner_email'],
-                "phone": row['phone'],
-                "address": row['address'],
-                "subscription_plan": row['subscription_plan'],
-                "is_demo": row['is_demo'],
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
-                "status": row['status'],
-                "vat_number": row['vat_number'],
-                "country": row['country'],
-                "currency": row['currency']
-            }
-            
-            print(f"✅ [Backend] Company found: {company}")
-            return company
-        else:
-            raise HTTPException(status_code=404, detail="Company not found")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ [Backend] Error getting company: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get company: {str(e)}")
-
-@app.delete("/companies/{company_id}")
-async def delete_company(company_id: str):
-    """Delete a company"""
-    try:
-        print(f"🗑️ [Backend] Deleting company with ID: {company_id}")
-        
-        # Check if company exists
-        check_query = """
-        SELECT id FROM public.companies WHERE id = %s
-        """
-        existing_company = execute_query(check_query, (int(company_id),), fetch=True)
-        
-        if not existing_company:
-            raise HTTPException(status_code=404, detail="Company not found")
-        
-        # Delete company (this will cascade to related records if foreign keys are set up)
-        delete_query = """
-        DELETE FROM public.companies WHERE id = %s
-        """
-        
-        execute_query(delete_query, (int(company_id),))
-        
-        print(f"✅ [Backend] Company {company_id} deleted successfully")
-        return {"message": f"Company {company_id} deleted successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ [Backend] Error deleting company: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete company: {str(e)}")
-
 # ================== USER ENDPOINTS ==================
 
 @app.post("/users")
@@ -576,10 +463,10 @@ async def get_users():
             users = []
             for row in result:
                 user = {
-                    "id": str(row['id']),
-                    "firebase_uid": row['firebase_uid'],
-                    "email": row['email'],
-                    "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                    "id": str(row[0]),
+                    "firebase_uid": row[1],
+                    "email": row[2],
+                    "created_at": row[3].isoformat() if row[3] else None
                 }
                 users.append(user)
             
@@ -607,13 +494,12 @@ async def get_user(user_id: str):
         
         result = execute_query(query, (int(user_id),), fetch=True)
         
-        if result and len(result) > 0:
-            row = result[0]
+        if result:
             user = {
-                "id": str(row['id']),
-                "firebase_uid": row['firebase_uid'],
-                "email": row['email'],
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                "id": str(result[0][0]),
+                "firebase_uid": result[0][1],
+                "email": result[0][2],
+                "created_at": result[0][3].isoformat() if result[0][3] else None
             }
             
             print(f"✅ [Backend] User found: {user}")
@@ -1886,46 +1772,6 @@ async def set_storage_config(mode: str = Query(..., regex="^(local|database)$"))
 # ================== YOUR EXISTING ENDPOINTS ==================
 # Add all your existing company, invoice, expense, payroll endpoints here...
 # I'm keeping this clean file focused on the PDF storage implementation
-
-# ================== VAT ENHANCEMENT ENDPOINTS ==================
-
-from vat_service import VATService
-from vat_models import ExpenseRequest, InvoiceRequest, EWorkerRequest, MileageRequest
-from decimal import Decimal
-
-@app.get("/vat/rates")
-async def get_vat_rates(country: str = "Ireland", active_only: bool = True):
-    """Get VAT rates for a country"""
-    return [rate.dict() for rate in VATService.get_vat_rates(country, active_only)]
-
-@app.get("/vat/expense-categories")
-async def get_expense_categories():
-    """Get all expense categories with VAT rates and business usage options"""
-    categories = VATService.get_expense_categories()
-    vat_rates = VATService.get_vat_rates()
-    business_usage_options = VATService.get_business_usage_options()
-    
-    return {
-        "categories": [cat.dict() for cat in categories],
-        "vat_rates": [rate.dict() for rate in vat_rates],
-        "business_usage_options": [opt.dict() for opt in business_usage_options]
-    }
-
-@app.post("/vat/calculate")
-async def calculate_vat(
-    net_amount: float,
-    vat_rate_id: Optional[int] = None,
-    vat_rate_percentage: Optional[float] = None,
-    business_usage_percentage: float = 100.0
-):
-    """Calculate VAT amounts"""
-    vat_calc = VATService.calculate_vat(
-        net_amount=Decimal(str(net_amount)),
-        vat_rate_id=vat_rate_id,
-        vat_rate_percentage=Decimal(str(vat_rate_percentage)) if vat_rate_percentage else None,
-        business_usage_percentage=Decimal(str(business_usage_percentage))
-    )
-    return vat_calc.dict()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

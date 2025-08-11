@@ -14,6 +14,7 @@ class AddInvoiceDialog extends StatefulWidget {
 
 class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _invoiceNumberController = TextEditingController();
   final _clientNameController = TextEditingController();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -24,6 +25,7 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
 
   @override
   void dispose() {
+    _invoiceNumberController.dispose();
     _amountController.dispose();
     _descriptionController.dispose();
     _clientNameController.dispose();
@@ -34,7 +36,7 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   void initState() {
     super.initState();
     _initializeCompanyContext();
-    // Removed _generateInvoiceNumber() - backend will generate the invoice number
+    _generateInvoiceNumber();
   }
 
   void _initializeCompanyContext() {
@@ -98,6 +100,14 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
     return '\$'; // Default fallback
   }
 
+  void _generateInvoiceNumber() {
+    // Generate invoice number based on current date
+    final now = DateTime.now();
+    final invoiceNumber =
+        'INV-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(8)}';
+    _invoiceNumberController.text = invoiceNumber;
+  }
+
   Future<void> _saveInvoice() async {
     // Prevent double submission
     if (_isSaving) {
@@ -151,8 +161,7 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
       print('🧾 [AddInvoiceDialog] Creating invoice object...');
       final invoice = Invoice(
         id: '',
-        invoiceNumber:
-            '', // Backend will generate the invoice number based on ID
+        invoiceNumber: _invoiceNumberController.text,
         clientName: _clientNameController.text,
         amount: double.parse(_amountController.text),
         description: _descriptionController.text,
@@ -251,6 +260,20 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                TextFormField(
+                  controller: _invoiceNumberController,
+                  decoration: const InputDecoration(
+                    labelText: 'Invoice Number',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter an invoice number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientNameController,
                   decoration: const InputDecoration(

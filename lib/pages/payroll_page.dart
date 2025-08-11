@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
 import '../utils/currency_utils.dart';
-import '../services/api_service.dart';
 
 class PayrollPage extends StatefulWidget {
   const PayrollPage({super.key});
@@ -161,7 +160,7 @@ class _PayrollPageState extends State<PayrollPage> {
 
               // Use the correct upload endpoint format matching expenses page
               final uri =
-                  Uri.parse('${ApiService.baseUrl}/attachments/upload').replace(
+                  Uri.parse('http://localhost:8000/attachments/upload').replace(
                 queryParameters: {
                   'entity_type': 'payroll_entry',
                   'entity_id': payrollEntry.id.toString(),
@@ -227,7 +226,7 @@ class _PayrollPageState extends State<PayrollPage> {
           '📄 Fetching payroll attachments for entry: ${payrollEntry.id}');
 
       final uri = Uri.parse(
-              '${ApiService.baseUrl}/attachments/payroll_entry/${payrollEntry.id}')
+              'http://localhost:8000/attachments/payroll_entry/${payrollEntry.id}')
           .replace(
         queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1',
@@ -326,7 +325,7 @@ class _PayrollPageState extends State<PayrollPage> {
           '📄 Downloading attachment: $attachmentId, filename: $filename');
 
       final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/attachments/$attachmentId/download'),
+        Uri.parse('http://localhost:8000/attachments/$attachmentId/download'),
       );
 
       if (response.statusCode == 200) {
@@ -380,7 +379,7 @@ class _PayrollPageState extends State<PayrollPage> {
         debugPrint('📄 Deleting attachment: $attachmentId');
 
         final response = await http.delete(
-          Uri.parse('${ApiService.baseUrl}/attachments/$attachmentId'),
+          Uri.parse('http://localhost:8000/attachments/$attachmentId'),
         );
 
         if (response.statusCode == 200) {

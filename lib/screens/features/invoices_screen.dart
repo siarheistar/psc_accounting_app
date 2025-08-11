@@ -411,25 +411,11 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                                     color: Colors.white,
                                   ),
                                 ),
-                                title: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      invoice['invoice_number'] ?? 'N/A',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Colors.deepPurple,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Client: ${invoice['client_name']}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
+                                title: Text(
+                                  'Client: ${invoice['client_name']}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,

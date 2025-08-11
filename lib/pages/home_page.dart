@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 
 import '../services/database_service.dart';
-import '../services/api_service.dart';
 import '../context/simple_company_context.dart';
 import '../utils/currency_utils.dart';
 import '../pages/invoices_page.dart';
@@ -346,7 +345,7 @@ class _HomePageState extends State<HomePage> {
 
     try {
       // Use the new multipart form upload to the refactored attachment system
-      final uri = Uri.parse('${ApiService.baseUrl}/attachments/upload').replace(
+      final uri = Uri.parse('http://localhost:8000/attachments/upload').replace(
         queryParameters: {
           'entity_type': entityType,
           'entity_id': entityId,
@@ -511,7 +510,7 @@ class _HomePageState extends State<HomePage> {
     try {
       // Use the new attachment listing endpoint
       final url =
-          Uri.parse('${ApiService.baseUrl}/attachments/$entityType/$entityId');
+          Uri.parse('http://localhost:8000/attachments/$entityType/$entityId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
@@ -565,7 +564,7 @@ class _HomePageState extends State<HomePage> {
 
       // Use the new attachment download endpoint
       final url =
-          Uri.parse('${ApiService.baseUrl}/attachments/download/$documentId');
+          Uri.parse('http://localhost:8000/attachments/download/$documentId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'

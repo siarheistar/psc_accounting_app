@@ -5,25 +5,34 @@ class Invoice {
   final String id;
   final String invoiceNumber;
   final String clientName;
-  final double amount;
-  final DateTime? date; // Make nullable to handle existing records
+  final double amount; // Legacy field - now contains gross amount
+  final DateTime? date;
   final DateTime dueDate;
   final String status;
   final DateTime createdAt;
   final String? description;
   final String? clientId;
+  // VAT-related fields matching database schema
+  final int? vatRateId;
+  final double? netAmount;
+  final double? vatAmount;
+  final double? grossAmount;
 
   Invoice({
     required this.id,
     required this.invoiceNumber,
     required this.clientName,
     required this.amount,
-    this.date, // Make optional
+    this.date,
     required this.dueDate,
     required this.status,
     required this.createdAt,
     this.description,
     this.clientId,
+    this.vatRateId,
+    this.netAmount,
+    this.vatAmount,
+    this.grossAmount,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) {
@@ -33,22 +42,25 @@ class Invoice {
         invoiceNumber: json['invoice_number']?.toString() ??
             'INV-${json['id'] ?? 'UNKNOWN'}',
         clientName: json['client_name']?.toString() ?? 'Unknown Client',
-        amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
-        // Use date field for invoice issue date
-        date: json['date'] != null
-            ? DateTime.parse(json['date'])
+        // For legacy compatibility, use gross_amount or fallback to amount
+        amount: double.tryParse(json['gross_amount']?.toString() ?? json['amount']?.toString() ?? '0') ?? 0.0,
+        date: json['date'] != null || json['issue_date'] != null
+            ? DateTime.parse(json['date'] ?? json['issue_date'])
             : DateTime.now(),
-        // Use due_date field for due date
         dueDate: json['due_date'] != null
             ? DateTime.parse(json['due_date'])
             : DateTime.now().add(const Duration(days: 30)),
         status: json['status']?.toString() ?? 'pending',
-        // Use created_at timestamp from database
         createdAt: json['created_at'] != null
             ? DateTime.parse(json['created_at'])
             : DateTime.now(),
         description: json['description']?.toString(),
         clientId: json['client_id']?.toString(),
+        // VAT-related fields
+        vatRateId: json['vat_rate_id'] != null ? int.tryParse(json['vat_rate_id'].toString()) : null,
+        netAmount: json['net_amount'] != null ? double.tryParse(json['net_amount'].toString()) : null,
+        vatAmount: json['vat_amount'] != null ? double.tryParse(json['vat_amount'].toString()) : null,
+        grossAmount: json['gross_amount'] != null ? double.tryParse(json['gross_amount'].toString()) : null,
       );
     } catch (e) {
       debugPrint('📄 Invoice.fromJson ERROR: $e');
@@ -65,6 +77,10 @@ class Invoice {
         createdAt: DateTime.now(),
         description: 'Failed to parse invoice data',
         clientId: null,
+        vatRateId: null,
+        netAmount: null,
+        vatAmount: null,
+        grossAmount: null,
       );
     }
   }
@@ -74,14 +90,19 @@ class Invoice {
       'id': id,
       'invoice_number': invoiceNumber,
       'client_name': clientName,
-      'amount': amount,
-      'date':
-          (date ?? createdAt).toIso8601String(), // Use createdAt as fallback
+      'amount': amount, // Legacy field for compatibility
+      'date': (date ?? createdAt).toIso8601String(),
+      'issue_date': (date ?? createdAt).toIso8601String(), // For new schema
       'due_date': dueDate.toIso8601String(),
       'status': status,
       'created_at': createdAt.toIso8601String(),
       'description': description,
       'client_id': clientId,
+      // VAT-related fields
+      'vat_rate_id': vatRateId,
+      'net_amount': netAmount,
+      'vat_amount': vatAmount,
+      'gross_amount': grossAmount,
     };
   }
 }
@@ -99,6 +120,7 @@ class Expense {
   final double? vatRate;
   final double? vatAmount;
   final double? grossAmount;
+  final double? netAmount;
   final DateTime? createdAt;
 
   Expense({
@@ -113,6 +135,7 @@ class Expense {
     this.vatRate,
     this.vatAmount,
     this.grossAmount,
+    this.netAmount,
     this.createdAt,
   });
 
@@ -138,6 +161,9 @@ class Expense {
       grossAmount: json['gross_amount'] != null
           ? double.tryParse(json['gross_amount'].toString())
           : null,
+      netAmount: json['net_amount'] != null
+          ? double.tryParse(json['net_amount'].toString())
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : null,
@@ -157,6 +183,7 @@ class Expense {
       'vat_rate': vatRate,
       'vat_amount': vatAmount,
       'gross_amount': grossAmount,
+      'net_amount': netAmount,
       'created_at': createdAt?.toIso8601String(),
     };
   }

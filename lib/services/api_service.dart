@@ -3,13 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Backend URL, overridable at build time:
-  // flutter run -d chrome --dart-define=API_BASE_URL=https://your-backend.onrender.com
-  // flutter build web --dart-define=API_BASE_URL=https://your-backend.onrender.com
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
-  );
+  static const String baseUrl = 'http://127.0.0.1:8000'; // FastAPI backend URL
 
   // Invoice methods
   static Future<List<Map<String, dynamic>>> getInvoices(
