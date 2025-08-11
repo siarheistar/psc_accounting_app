@@ -9,7 +9,6 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
-      # Set your allowed frontend origins (comma-separated) in Render Dashboard
-      # Example: https://yourapp.web.app, https://yourapp.firebaseapp.com
+      # Comma-separated list of allowed frontend origins (no spaces, no trailing slashes)
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: "https://psc-accounting-web.web.app,https://psc-accounting-web.firebaseapp.com,http://localhost:3000,http://127.0.0.1:3000"
