@@ -43,7 +43,10 @@ class Invoice {
             'INV-${json['id'] ?? 'UNKNOWN'}',
         clientName: json['client_name']?.toString() ?? 'Unknown Client',
         // For legacy compatibility, use gross_amount or fallback to amount
-        amount: double.tryParse(json['gross_amount']?.toString() ?? json['amount']?.toString() ?? '0') ?? 0.0,
+        amount: double.tryParse(json['gross_amount']?.toString() ??
+                json['amount']?.toString() ??
+                '0') ??
+            0.0,
         date: json['date'] != null || json['issue_date'] != null
             ? DateTime.parse(json['date'] ?? json['issue_date'])
             : DateTime.now(),
@@ -56,11 +59,27 @@ class Invoice {
             : DateTime.now(),
         description: json['description']?.toString(),
         clientId: json['client_id']?.toString(),
-        // VAT-related fields
-        vatRateId: json['vat_rate_id'] != null ? int.tryParse(json['vat_rate_id'].toString()) : null,
-        netAmount: json['net_amount'] != null ? double.tryParse(json['net_amount'].toString()) : null,
-        vatAmount: json['vat_amount'] != null ? double.tryParse(json['vat_amount'].toString()) : null,
-        grossAmount: json['gross_amount'] != null ? double.tryParse(json['gross_amount'].toString()) : null,
+        // VAT-related fields - support both camelCase (API) and snake_case (legacy)
+        vatRateId: json['vatRateId'] != null
+            ? int.tryParse(json['vatRateId'].toString())
+            : (json['vat_rate_id'] != null
+                ? int.tryParse(json['vat_rate_id'].toString())
+                : null),
+        netAmount: json['netAmount'] != null
+            ? double.tryParse(json['netAmount'].toString())
+            : (json['net_amount'] != null
+                ? double.tryParse(json['net_amount'].toString())
+                : null),
+        vatAmount: json['vatAmount'] != null
+            ? double.tryParse(json['vatAmount'].toString())
+            : (json['vat_amount'] != null
+                ? double.tryParse(json['vat_amount'].toString())
+                : null),
+        grossAmount: json['grossAmount'] != null
+            ? double.tryParse(json['grossAmount'].toString())
+            : (json['gross_amount'] != null
+                ? double.tryParse(json['gross_amount'].toString())
+                : null),
       );
     } catch (e) {
       debugPrint('📄 Invoice.fromJson ERROR: $e');

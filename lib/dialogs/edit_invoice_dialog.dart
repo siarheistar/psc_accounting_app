@@ -74,12 +74,24 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
 
         // Load the actual VAT rate from the invoice data
         if (widget.invoice.vatRateId != null) {
+          print(
+              '🧾 [EditInvoiceDialog] Looking for VAT rate ID: ${widget.invoice.vatRateId}');
+          print('🧾 [EditInvoiceDialog] Available VAT rates:');
+          for (var rate in rates) {
+            print(
+                '🧾 [EditInvoiceDialog] - ID: ${rate.id}, Name: ${rate.rateName}, Rate: ${rate.ratePercentage}%');
+          }
+
           _selectedVATRate = rates.firstWhere(
             (rate) => rate.id == widget.invoice.vatRateId,
-            orElse: () => rates.isNotEmpty ? rates.first : rates.first,
+            orElse: () {
+              print(
+                  '🧾 [EditInvoiceDialog] ❌ VAT rate ID ${widget.invoice.vatRateId} not found in available rates!');
+              return rates.isNotEmpty ? rates.first : rates.first;
+            },
           );
           print(
-              '🧾 [EditInvoiceDialog] Loaded VAT rate from invoice: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%) - ID: ${widget.invoice.vatRateId}');
+              '🧾 [EditInvoiceDialog] ✅ Loaded VAT rate from invoice: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%) - ID: ${widget.invoice.vatRateId}');
         } else {
           // If no VAT rate in invoice, don't select any (let user choose)
           _selectedVATRate = null;
