@@ -71,20 +71,24 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
       setState(() {
         _vatRates = rates;
         _isLoadingVATRates = false;
-        
+
         // ALWAYS default to Standard VAT rate (23%) for Ireland
         _selectedVATRate = rates.firstWhere(
-          (rate) => rate.rateName.toLowerCase().contains('standard') || rate.ratePercentage == 23.0,
-          orElse: () => rates.isNotEmpty ? rates.first : VATRate(
-            id: 1,
-            country: 'Ireland',
-            rateName: 'Standard',
-            ratePercentage: 23.0,
-            effectiveFrom: DateTime.now()
-          ),
+          (rate) =>
+              rate.rateName.toLowerCase().contains('standard') ||
+              rate.ratePercentage == 23.0,
+          orElse: () => rates.isNotEmpty
+              ? rates.first
+              : VATRate(
+                  id: 1,
+                  country: 'Ireland',
+                  rateName: 'Standard',
+                  ratePercentage: 23.0,
+                  effectiveFrom: DateTime.now()),
         );
-        
-        print('🧾 [EditInvoiceDialog] Forced VAT rate to Standard: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%)');
+
+        print(
+            '🧾 [EditInvoiceDialog] Forced VAT rate to Standard: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%)');
       });
 
       // Trigger initial VAT calculation after rates are loaded
@@ -199,6 +203,8 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
       // Update net amount field when VAT calculation changes
       if (calculation != null) {
         _netAmountController.text = calculation.netAmount.toStringAsFixed(2);
+      } else {
+        _netAmountController.clear();
       }
     });
   }
@@ -210,11 +216,13 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
     if (grossAmount != null && _selectedVATRate != null) {
       print(
           '🧾 [EditInvoiceDialog] Triggering VAT calculation: gross=€$grossAmount, rate=${_selectedVATRate?.ratePercentage}%');
-      print('🧾 [EditInvoiceDialog] VAT Rate Details: ${_selectedVATRate?.rateName} (ID: ${_selectedVATRate?.id})');
+      print(
+          '🧾 [EditInvoiceDialog] VAT Rate Details: ${_selectedVATRate?.rateName} (ID: ${_selectedVATRate?.id})');
       // The calculation will be triggered automatically by the widget
       // when it receives the updated grossAmount and selectedVATRate
     } else {
-      print('🧾 [EditInvoiceDialog] Cannot trigger VAT calculation: grossAmount=$grossAmount, vatRate=$_selectedVATRate');
+      print(
+          '🧾 [EditInvoiceDialog] Cannot trigger VAT calculation: grossAmount=$grossAmount, vatRate=$_selectedVATRate');
     }
   }
 
@@ -570,7 +578,8 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: _isLoadingVATRates
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(
+                                    child: CircularProgressIndicator())
                                 : DropdownButtonFormField<VATRate>(
                                     value: _selectedVATRate,
                                     decoration: const InputDecoration(
