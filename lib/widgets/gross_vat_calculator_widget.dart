@@ -21,7 +21,8 @@ class GrossVATCalculatorWidget extends StatefulWidget {
   });
 
   @override
-  State<GrossVATCalculatorWidget> createState() => _GrossVATCalculatorWidgetState();
+  State<GrossVATCalculatorWidget> createState() =>
+      _GrossVATCalculatorWidgetState();
 }
 
 class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
@@ -29,9 +30,18 @@ class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
   bool _isCalculating = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Trigger initial calculation if both grossAmount and VAT rate are available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _calculateVAT();
+    });
+  }
+
+  @override
   void didUpdateWidget(GrossVATCalculatorWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.grossAmount != oldWidget.grossAmount ||
         widget.selectedVATRate != oldWidget.selectedVATRate ||
         widget.businessUsagePercentage != oldWidget.businessUsagePercentage) {
@@ -48,8 +58,8 @@ class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
   }
 
   Future<void> _calculateVAT() async {
-    if (widget.grossAmount == null || 
-        widget.selectedVATRate == null || 
+    if (widget.grossAmount == null ||
+        widget.selectedVATRate == null ||
         widget.grossAmount! <= 0) {
       setState(() {
         _calculation = null;
@@ -79,7 +89,7 @@ class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
         _isCalculating = false;
       });
       widget.onCalculationChanged(null);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -141,26 +151,21 @@ class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
               ],
             ),
             const SizedBox(height: 12),
-            
             _buildCalculationRow(
               'Gross Amount (inc VAT):',
               '${_getCurrencySymbol()}${_calculation!.grossAmount.toStringAsFixed(2)}',
               isBold: true,
             ),
-            
             _buildCalculationRow(
               'VAT (${_calculation!.vatRatePercentage.toStringAsFixed(1)}%):',
               '${_getCurrencySymbol()}${_calculation!.vatAmount.toStringAsFixed(2)}',
             ),
-            
             const Divider(height: 20),
-            
             _buildCalculationRow(
               'Net Amount (ex VAT):',
               '${_getCurrencySymbol()}${_calculation!.netAmount.toStringAsFixed(2)}',
             ),
-            
-            if (_calculation!.deductibleAmount != null && 
+            if (_calculation!.deductibleAmount != null &&
                 widget.businessUsagePercentage != 100.0) ...[
               const SizedBox(height: 8),
               Container(
@@ -191,8 +196,7 @@ class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
                 ),
               ),
             ],
-            
-            if (widget.businessUsagePercentage != null && 
+            if (widget.businessUsagePercentage != null &&
                 widget.businessUsagePercentage! < 100.0) ...[
               const SizedBox(height: 8),
               Container(
@@ -203,9 +207,8 @@ class _GrossVATCalculatorWidgetState extends State<GrossVATCalculatorWidget> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, 
-                         size: 16, 
-                         color: Colors.amber[700]),
+                    Icon(Icons.info_outline,
+                        size: 16, color: Colors.amber[700]),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(

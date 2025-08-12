@@ -441,6 +441,11 @@ class DatabaseService {
         'status': invoice.status,
         'description': invoice.description,
         'created_at': DateTime.now().toIso8601String(),
+        // VAT-related fields
+        'vat_rate_id': invoice.vatRateId,
+        'net_amount': invoice.netAmount,
+        'vat_amount': invoice.vatAmount,
+        'gross_amount': invoice.grossAmount,
       };
 
       debugPrint('📄 API URL: ${_buildUrl('invoices')}');
@@ -500,6 +505,11 @@ class DatabaseService {
         'status': invoice.status,
         'description': invoice.description,
         'updated_at': DateTime.now().toIso8601String(),
+        // VAT-related fields
+        'vat_rate_id': invoice.vatRateId,
+        'net_amount': invoice.netAmount,
+        'vat_amount': invoice.vatAmount,
+        'gross_amount': invoice.grossAmount,
       };
 
       final url = _buildUrlWithId('invoices', invoice.id);
@@ -632,6 +642,11 @@ class DatabaseService {
         'status': expense.status,
         'notes': expense.notes,
         'created_at': DateTime.now().toIso8601String(),
+        // VAT-related fields
+        'vat_rate': expense.vatRate,
+        'vat_amount': expense.vatAmount,
+        'gross_amount': expense.grossAmount,
+        'net_amount': expense.netAmount,
       };
 
       final response = await http
@@ -681,6 +696,11 @@ class DatabaseService {
         'status': expense.status,
         'notes': expense.notes,
         'updated_at': DateTime.now().toIso8601String(),
+        // VAT-related fields
+        'vat_rate': expense.vatRate,
+        'vat_amount': expense.vatAmount,
+        'gross_amount': expense.grossAmount,
+        'net_amount': expense.netAmount,
       };
 
       print('💰 API URL: ${_buildUrlWithId('expenses', expense.id)}');

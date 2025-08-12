@@ -43,9 +43,24 @@ async def calculate_vat(
     vat_rate_percentage: Optional[float] = None,
     business_usage_percentage: float = 100.0
 ) -> VATCalculationResponse:
-    """Calculate VAT amounts"""
+    """Calculate VAT amounts from net amount"""
     return VATService.calculate_vat(
         net_amount=Decimal(str(net_amount)),
+        vat_rate_id=vat_rate_id,
+        vat_rate_percentage=Decimal(str(vat_rate_percentage)) if vat_rate_percentage else None,
+        business_usage_percentage=Decimal(str(business_usage_percentage))
+    )
+
+@router.post("/vat/calculate-from-gross")
+async def calculate_vat_from_gross(
+    gross_amount: float,
+    vat_rate_id: Optional[str] = None,
+    vat_rate_percentage: Optional[float] = None,
+    business_usage_percentage: float = 100.0
+) -> VATCalculationResponse:
+    """Calculate VAT breakdown from gross amount"""
+    return VATService.calculate_vat_from_gross(
+        gross_amount=Decimal(str(gross_amount)),
         vat_rate_id=vat_rate_id,
         vat_rate_percentage=Decimal(str(vat_rate_percentage)) if vat_rate_percentage else None,
         business_usage_percentage=Decimal(str(business_usage_percentage))

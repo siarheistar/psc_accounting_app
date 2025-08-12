@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
+import '../models/vat_models.dart';
 import '../services/database_service.dart';
+import '../services/vat_service.dart';
 import '../context/simple_company_context.dart';
 import '../utils/currency_utils.dart';
+import '../widgets/gross_vat_calculator_widget.dart';
 
 class EditInvoiceDialog extends StatefulWidget {
   final Invoice invoice;
@@ -18,12 +21,19 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _invoiceNumberController;
   late final TextEditingController _clientNameController;
-  late final TextEditingController _amountController;
+  late final TextEditingController _grossAmountController;
+  late final TextEditingController _netAmountController;
   late final TextEditingController _descriptionController;
 
   late DateTime _selectedDate;
   bool _isUpdating = false;
   String _selectedStatus = 'pending'; // Add status field
+
+  // VAT-related fields
+  VATRate? _selectedVATRate;
+  VATCalculation? _vatCalculation;
+  List<VATRate> _vatRates = [];
+  bool _isLoadingVATRates = true;
 
   @override
   void initState() {
@@ -41,11 +51,71 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
     print('🧾 [EditInvoiceDialog] - Due Date: ${widget.invoice.dueDate}');
     print('🧾 [EditInvoiceDialog] - Status: ${widget.invoice.status}');
     print('🧾 [EditInvoiceDialog] - Created At: ${widget.invoice.createdAt}');
+    print('🧾 [EditInvoiceDialog] - VAT Rate ID: ${widget.invoice.vatRateId}');
+    print('🧾 [EditInvoiceDialog] - Net Amount: ${widget.invoice.netAmount}');
+    print('🧾 [EditInvoiceDialog] - VAT Amount: ${widget.invoice.vatAmount}');
+    print(
+        '🧾 [EditInvoiceDialog] - Gross Amount: ${widget.invoice.grossAmount}');
 
     _initializeCompanyContext();
+    _loadVATRates();
     _initializeControllers();
 
     print('🧾 [EditInvoiceDialog] === EDIT DIALOG INITIALIZED ===');
+  }
+
+  Future<void> _loadVATRates() async {
+    try {
+      final rates =
+          await VATService.getVATRates(country: 'Ireland', activeOnly: true);
+      setState(() {
+        _vatRates = rates;
+        _isLoadingVATRates = false;
+        
+        // ALWAYS default to Standard VAT rate (23%) for Ireland
+        _selectedVATRate = rates.firstWhere(
+          (rate) => rate.rateName.toLowerCase().contains('standard') || rate.ratePercentage == 23.0,
+          orElse: () => rates.isNotEmpty ? rates.first : VATRate(
+            id: 1,
+            country: 'Ireland',
+            rateName: 'Standard',
+            ratePercentage: 23.0,
+            effectiveFrom: DateTime.now()
+          ),
+        );
+        
+        print('🧾 [EditInvoiceDialog] Forced VAT rate to Standard: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%)');
+      });
+
+      // Trigger initial VAT calculation after rates are loaded
+      if (_selectedVATRate != null) {
+        _triggerVATCalculation();
+        // Force immediate calculation to ensure VAT breakdown shows
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedVATRate != null) {
+            _triggerVATCalculation();
+          }
+        });
+      }
+
+      // Initialize VAT calculation from existing invoice data if available
+      if (widget.invoice.netAmount != null &&
+          widget.invoice.vatAmount != null &&
+          widget.invoice.grossAmount != null) {
+        _vatCalculation = VATCalculation(
+          grossAmount: widget.invoice.grossAmount!,
+          netAmount: widget.invoice.netAmount!,
+          vatAmount: widget.invoice.vatAmount!,
+          vatRatePercentage: _selectedVATRate?.ratePercentage ?? 0.0,
+          businessUsagePercentage: 100.0,
+        );
+        print(
+            '🧾 [EditInvoiceDialog] Initialized VAT calculation from existing data: gross=€${widget.invoice.grossAmount}, net=€${widget.invoice.netAmount}, vat=€${widget.invoice.vatAmount}');
+      }
+    } catch (e) {
+      setState(() => _isLoadingVATRates = false);
+      print('Error loading VAT rates: $e');
+    }
   }
 
   void _initializeControllers() {
@@ -53,8 +123,12 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
         TextEditingController(text: widget.invoice.invoiceNumber);
     _clientNameController =
         TextEditingController(text: widget.invoice.clientName);
-    _amountController =
-        TextEditingController(text: widget.invoice.amount.toString());
+    // Use grossAmount if available, otherwise use the legacy amount field
+    _grossAmountController = TextEditingController(
+        text: (widget.invoice.grossAmount ?? widget.invoice.amount).toString());
+    // Initialize net amount from existing invoice data
+    _netAmountController = TextEditingController(
+        text: (widget.invoice.netAmount ?? widget.invoice.amount).toString());
     _descriptionController =
         TextEditingController(text: widget.invoice.description);
     _selectedDate = widget.invoice.dueDate;
@@ -72,7 +146,8 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
   @override
   void dispose() {
     _invoiceNumberController.dispose();
-    _amountController.dispose();
+    _grossAmountController.dispose();
+    _netAmountController.dispose();
     _descriptionController.dispose();
     _clientNameController.dispose();
     super.dispose();
@@ -118,6 +193,36 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
     return '\$'; // Default fallback
   }
 
+  void _onVATCalculationChanged(VATCalculation? calculation) {
+    setState(() {
+      _vatCalculation = calculation;
+      // Update net amount field when VAT calculation changes
+      if (calculation != null) {
+        _netAmountController.text = calculation.netAmount.toStringAsFixed(2);
+      }
+    });
+  }
+
+  void _triggerVATCalculation() {
+    // This will cause the GrossVATCalculatorWidget to recalculate
+    // when grossAmount and selectedVATRate are both available
+    final grossAmount = _getGrossAmount();
+    if (grossAmount != null && _selectedVATRate != null) {
+      print(
+          '🧾 [EditInvoiceDialog] Triggering VAT calculation: gross=€$grossAmount, rate=${_selectedVATRate?.ratePercentage}%');
+      print('🧾 [EditInvoiceDialog] VAT Rate Details: ${_selectedVATRate?.rateName} (ID: ${_selectedVATRate?.id})');
+      // The calculation will be triggered automatically by the widget
+      // when it receives the updated grossAmount and selectedVATRate
+    } else {
+      print('🧾 [EditInvoiceDialog] Cannot trigger VAT calculation: grossAmount=$grossAmount, vatRate=$_selectedVATRate');
+    }
+  }
+
+  double? _getGrossAmount() {
+    final text = _grossAmountController.text.trim();
+    return text.isEmpty ? null : double.tryParse(text);
+  }
+
   Future<void> _updateInvoice() async {
     if (!_formKey.currentState!.validate() || _isUpdating) {
       print('❌ [EditInvoiceDialog] Form validation failed or already updating');
@@ -135,7 +240,8 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
         '🧾 [EditInvoiceDialog] - Invoice Number: ${_invoiceNumberController.text}');
     print(
         '🧾 [EditInvoiceDialog] - Client Name: ${_clientNameController.text}');
-    print('🧾 [EditInvoiceDialog] - Amount: ${_amountController.text}');
+    print(
+        '🧾 [EditInvoiceDialog] - Gross Amount: ${_grossAmountController.text}');
     print(
         '🧾 [EditInvoiceDialog] - Description: ${_descriptionController.text}');
     print('🧾 [EditInvoiceDialog] - Due Date: $_selectedDate');
@@ -201,12 +307,15 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
       print(
           '🧾 [EditInvoiceDialog] Original invoice createdAt: ${widget.invoice.createdAt}');
 
-      // Validate amount before parsing
-      final amountText = _amountController.text.trim();
-      final parsedAmount = double.tryParse(amountText);
-      if (parsedAmount == null) {
-        throw Exception('Invalid amount format: "$amountText"');
+      // Validate gross amount before parsing
+      final grossAmountText = _grossAmountController.text.trim();
+      final parsedGrossAmount = double.tryParse(grossAmountText);
+      if (parsedGrossAmount == null) {
+        throw Exception('Invalid gross amount format: "$grossAmountText"');
       }
+
+      // Calculate net amount from VAT calculation or fallback to gross amount
+      final netAmount = _vatCalculation?.netAmount ?? parsedGrossAmount;
 
       // Ensure date is never null - use createdAt as fallback
       final invoiceDate = widget.invoice.date ?? widget.invoice.createdAt;
@@ -216,12 +325,17 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
         id: widget.invoice.id,
         invoiceNumber: _invoiceNumberController.text.trim(),
         clientName: _clientNameController.text.trim(),
-        amount: parsedAmount,
+        amount: parsedGrossAmount, // Use gross amount for legacy compatibility
         description: _descriptionController.text.trim(),
         date: invoiceDate, // Ensure date is never null
         dueDate: _selectedDate,
         status: _selectedStatus, // Use selected status
         createdAt: widget.invoice.createdAt, // Keep original creation date
+        // VAT fields
+        vatRateId: _selectedVATRate?.id,
+        netAmount: _vatCalculation?.netAmount ?? netAmount,
+        vatAmount: _vatCalculation?.vatAmount,
+        grossAmount: _vatCalculation?.grossAmount ?? parsedGrossAmount,
       );
 
       print('🧾 [EditInvoiceDialog] Updated invoice object created:');
@@ -337,7 +451,9 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
       title: const Text('Edit Invoice'),
       content: SingleChildScrollView(
         child: SizedBox(
-          width: 400,
+          width: MediaQuery.of(context).size.width > 400
+              ? 400
+              : MediaQuery.of(context).size.width * 0.9,
           child: Form(
             key: _formKey,
             child: Column(
@@ -371,27 +487,137 @@ class _EditInvoiceDialogState extends State<EditInvoiceDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
+                // Gross Amount and VAT Rate Row - Responsive Layout
+                MediaQuery.of(context).size.width < 500
+                    ? Column(
+                        children: [
+                          TextFormField(
+                            controller: _grossAmountController,
+                            decoration: InputDecoration(
+                              labelText: 'Gross Amount (inc VAT)',
+                              border: const OutlineInputBorder(),
+                              prefixText: _getCurrencySymbol(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
+                            onChanged: (_) => setState(() {}),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter an amount';
+                              }
+                              if (double.tryParse(value) == null) {
+                                return 'Please enter a valid amount';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          _isLoadingVATRates
+                              ? const Center(child: CircularProgressIndicator())
+                              : DropdownButtonFormField<VATRate>(
+                                  value: _selectedVATRate,
+                                  decoration: const InputDecoration(
+                                    labelText: 'VAT Rate',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.percent),
+                                  ),
+                                  items: _vatRates
+                                      .map((rate) => DropdownMenuItem(
+                                            value: rate,
+                                            child: Text(
+                                                '${rate.rateName} (${rate.ratePercentage}%)'),
+                                          ))
+                                      .toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedVATRate = value;
+                                    });
+                                  },
+                                ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _grossAmountController,
+                              decoration: InputDecoration(
+                                labelText: 'Gross Amount (inc VAT)',
+                                border: const OutlineInputBorder(),
+                                prefixText: _getCurrencySymbol(),
+                                helperText: 'Total amount including VAT',
+                              ),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d*\.?\d{0,2}')),
+                              ],
+                              onChanged: (_) => setState(() {}),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter an amount';
+                                }
+                                if (double.tryParse(value) == null) {
+                                  return 'Please enter a valid amount';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _isLoadingVATRates
+                                ? const Center(child: CircularProgressIndicator())
+                                : DropdownButtonFormField<VATRate>(
+                                    value: _selectedVATRate,
+                                    decoration: const InputDecoration(
+                                      labelText: 'VAT Rate',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.percent),
+                                      helperText: 'Ireland VAT rate',
+                                    ),
+                                    items: _vatRates
+                                        .map((rate) => DropdownMenuItem(
+                                              value: rate,
+                                              child: Text(
+                                                  '${rate.rateName} (${rate.ratePercentage}%)'),
+                                            ))
+                                        .toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedVATRate = value;
+                                      });
+                                    },
+                                  ),
+                          ),
+                        ],
+                      ),
+                const SizedBox(height: 16),
+                // Net Amount Field (Read-only, calculated from VAT)
                 TextFormField(
-                  controller: _amountController,
+                  controller: _netAmountController,
                   decoration: InputDecoration(
-                    labelText: 'Amount',
+                    labelText: 'Net Amount (ex VAT)',
                     border: const OutlineInputBorder(),
                     prefixText: _getCurrencySymbol(),
+                    helperText: 'Calculated automatically from gross amount',
+                    filled: true,
+                    fillColor: Colors.grey[50],
                   ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter an amount';
-                    }
-                    if (double.tryParse(value) == null) {
-                      return 'Please enter a valid amount';
-                    }
-                    return null;
-                  },
+                  readOnly: true,
+                  style: TextStyle(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                GrossVATCalculatorWidget(
+                  grossAmount: _getGrossAmount(),
+                  selectedVATRate: _selectedVATRate,
+                  businessUsagePercentage:
+                      100.0, // Invoices are always 100% business
+                  onCalculationChanged: _onVATCalculationChanged,
+                  isLoading: _isLoadingVATRates,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

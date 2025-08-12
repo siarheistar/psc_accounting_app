@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/accounting_models.dart';
+import '../models/vat_models.dart';
 import '../services/database_service.dart';
+import '../services/vat_service.dart';
 import '../context/simple_company_context.dart';
 import '../utils/currency_utils.dart';
+import '../widgets/gross_vat_calculator_widget.dart';
 
 class AddInvoiceDialog extends StatefulWidget {
   const AddInvoiceDialog({super.key});
@@ -16,17 +19,25 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   final _formKey = GlobalKey<FormState>();
   final _invoiceNumberController = TextEditingController();
   final _clientNameController = TextEditingController();
-  final _amountController = TextEditingController();
+  final _grossAmountController = TextEditingController();
+  final _netAmountController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
   String _selectedStatus = 'pending'; // Add status field
   bool _isSaving = false; // Add saving state to prevent double submission
+  
+  // VAT-related fields
+  VATRate? _selectedVATRate;
+  VATCalculation? _vatCalculation;
+  List<VATRate> _vatRates = [];
+  bool _isLoadingVATRates = true;
 
   @override
   void dispose() {
     _invoiceNumberController.dispose();
-    _amountController.dispose();
+    _grossAmountController.dispose();
+    _netAmountController.dispose();
     _descriptionController.dispose();
     _clientNameController.dispose();
     super.dispose();
@@ -36,6 +47,7 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
   void initState() {
     super.initState();
     _initializeCompanyContext();
+    _loadVATRates();
     _generateInvoiceNumber();
   }
 
@@ -92,12 +104,54 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
     print('🔍 [DEBUG] === END COMPANY CONTEXT INITIALIZATION ===');
   }
 
+  Future<void> _loadVATRates() async {
+    print('🧾 [AddInvoiceDialog] Starting VAT rates loading...');
+    try {
+      final rates = await VATService.getVATRates(country: 'Ireland', activeOnly: true);
+      print('🧾 [AddInvoiceDialog] Received ${rates.length} VAT rates');
+      
+      setState(() {
+        _vatRates = rates;
+        _isLoadingVATRates = false;
+        // Set default VAT rate (Standard rate)
+        _selectedVATRate = rates.isNotEmpty 
+            ? rates.firstWhere(
+                (rate) => rate.rateName.toLowerCase().contains('standard'),
+                orElse: () => rates.first,
+              )
+            : null;
+      });
+      
+      print('🧾 [AddInvoiceDialog] Selected default VAT rate: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%)');
+    } catch (e) {
+      setState(() => _isLoadingVATRates = false);
+      print('❌ [AddInvoiceDialog] Error loading VAT rates: $e');
+    }
+  }
+
   String _getCurrencySymbol() {
     final selectedCompany = SimpleCompanyContext.selectedCompany;
     if (selectedCompany?.currency != null) {
       return CurrencyUtils.getCurrencySymbol(selectedCompany!.currency!);
     }
     return '\$'; // Default fallback
+  }
+
+  void _onVATCalculationChanged(VATCalculation? calculation) {
+    setState(() {
+      _vatCalculation = calculation;
+      // Update net amount field when VAT calculation changes
+      if (calculation != null) {
+        _netAmountController.text = calculation.netAmount.toStringAsFixed(2);
+      } else {
+        _netAmountController.clear();
+      }
+    });
+  }
+
+  double? _getGrossAmount() {
+    final text = _grossAmountController.text.trim();
+    return text.isEmpty ? null : double.tryParse(text);
   }
 
   void _generateInvoiceNumber() {
@@ -159,16 +213,24 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
 
     try {
       print('🧾 [AddInvoiceDialog] Creating invoice object...');
+      final grossAmount = double.parse(_grossAmountController.text);
+      final netAmount = _vatCalculation?.netAmount ?? grossAmount;
+      
       final invoice = Invoice(
         id: '',
         invoiceNumber: _invoiceNumberController.text,
         clientName: _clientNameController.text,
-        amount: double.parse(_amountController.text),
+        amount: grossAmount, // Use gross amount for compatibility
         description: _descriptionController.text,
         date: _selectedDate, // Invoice issue date (optional parameter)
         dueDate: _selectedDate.add(const Duration(days: 30)),
         status: _selectedStatus, // Use selected status
         createdAt: DateTime.now(),
+        // VAT fields
+        vatRateId: _selectedVATRate?.id,
+        netAmount: _vatCalculation?.netAmount ?? netAmount,
+        vatAmount: _vatCalculation?.vatAmount,
+        grossAmount: _vatCalculation?.grossAmount ?? grossAmount,
       );
 
       print('🧾 [AddInvoiceDialog] Calling insertInvoice...');
@@ -288,27 +350,90 @@ class _AddInvoiceDialogState extends State<AddInvoiceDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
+                // Gross Amount and VAT Rate Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _grossAmountController,
+                        decoration: InputDecoration(
+                          labelText: 'Gross Amount (inc VAT)',
+                          border: const OutlineInputBorder(),
+                          prefixText: _getCurrencySymbol(),
+                          helperText: 'Total amount including VAT',
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                        onChanged: (_) => setState(() {}), // Trigger rebuild for VAT calculation
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter an amount';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter a valid amount';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _isLoadingVATRates
+                          ? const Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<VATRate>(
+                              value: _selectedVATRate,
+                              decoration: const InputDecoration(
+                                labelText: 'VAT Rate',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.percent),
+                                helperText: 'Ireland VAT rate',
+                              ),
+                              items: _vatRates
+                                  .map((rate) => DropdownMenuItem(
+                                        value: rate,
+                                        child: Text('${rate.rateName} (${rate.ratePercentage}%)'),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedVATRate = value;
+                                });
+                              },
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Select VAT rate';
+                                }
+                                return null;
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Net Amount Field (Read-only, calculated from VAT)
                 TextFormField(
-                  controller: _amountController,
+                  controller: _netAmountController,
                   decoration: InputDecoration(
-                    labelText: 'Amount',
+                    labelText: 'Net Amount (ex VAT)',
                     border: const OutlineInputBorder(),
                     prefixText: _getCurrencySymbol(),
+                    helperText: 'Calculated automatically from gross amount',
+                    filled: true,
+                    fillColor: Colors.grey[50],
                   ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter an amount';
-                    }
-                    if (double.tryParse(value) == null) {
-                      return 'Please enter a valid amount';
-                    }
-                    return null;
-                  },
+                  readOnly: true,
+                  style: TextStyle(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                GrossVATCalculatorWidget(
+                  grossAmount: _getGrossAmount(),
+                  selectedVATRate: _selectedVATRate,
+                  businessUsagePercentage: 100.0, // Invoices are always 100% business
+                  onCalculationChanged: _onVATCalculationChanged,
+                  isLoading: _isLoadingVATRates,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

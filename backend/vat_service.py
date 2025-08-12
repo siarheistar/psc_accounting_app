@@ -140,6 +140,47 @@ class VATService:
         )
     
     @staticmethod
+    def calculate_vat_from_gross(
+        gross_amount: Decimal, 
+        vat_rate_id: Optional[int] = None, 
+        vat_rate_percentage: Optional[Decimal] = None,
+        business_usage_percentage: Decimal = Decimal('100.00')
+    ) -> VATCalculationResponse:
+        """Calculate VAT breakdown from gross amount with business usage"""
+        
+        # Get VAT rate percentage if not provided
+        if vat_rate_percentage is None and vat_rate_id:
+            vat_rate_percentage = VATService.get_vat_rate_percentage(vat_rate_id)
+        
+        if vat_rate_percentage is None:
+            vat_rate_percentage = Decimal('23.00')  # Default Irish standard rate
+        
+        # Calculate net amount from gross (reverse VAT calculation)
+        # gross_amount = net_amount * (1 + vat_rate/100)
+        # net_amount = gross_amount / (1 + vat_rate/100)
+        vat_multiplier = Decimal('1') + (vat_rate_percentage / Decimal('100'))
+        net_amount = (gross_amount / vat_multiplier).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        
+        # Calculate VAT amount
+        vat_amount = gross_amount - net_amount
+        
+        # Calculate deductible amount based on business usage
+        deductible_amount = (net_amount * business_usage_percentage / Decimal('100')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        
+        return VATCalculationResponse(
+            net_amount=net_amount,
+            vat_rate_percentage=vat_rate_percentage,
+            vat_amount=vat_amount,
+            gross_amount=gross_amount,
+            deductible_amount=deductible_amount,
+            business_usage_percentage=business_usage_percentage
+        )
+    
+    @staticmethod
     def get_vat_rate_percentage(vat_rate_id: int) -> Optional[Decimal]:
         """Get VAT rate percentage by ID"""
         query = """

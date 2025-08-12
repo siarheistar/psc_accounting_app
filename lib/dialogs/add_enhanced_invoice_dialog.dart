@@ -6,7 +6,7 @@ import '../services/database_service.dart';
 import '../services/vat_service.dart';
 import '../context/simple_company_context.dart';
 import '../utils/currency_utils.dart';
-import '../widgets/vat_calculator_widget.dart';
+import '../widgets/gross_vat_calculator_widget.dart';
 
 class AddEnhancedInvoiceDialog extends StatefulWidget {
   const AddEnhancedInvoiceDialog({super.key});
@@ -20,6 +20,7 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
   final DatabaseService _dbService = DatabaseService();
 
   final _clientNameController = TextEditingController();
+  final _grossAmountController = TextEditingController();
   final _netAmountController = TextEditingController();
   final _descriptionController = TextEditingController();
 
@@ -41,6 +42,7 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
 
   @override
   void dispose() {
+    _grossAmountController.dispose();
     _netAmountController.dispose();
     _descriptionController.dispose();
     _clientNameController.dispose();
@@ -112,11 +114,17 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
   void _onVATCalculationChanged(VATCalculation? calculation) {
     setState(() {
       _vatCalculation = calculation;
+      // Update net amount field when VAT calculation changes
+      if (calculation != null) {
+        _netAmountController.text = calculation.netAmount.toStringAsFixed(2);
+      } else {
+        _netAmountController.clear();
+      }
     });
   }
 
-  double? _getNetAmount() {
-    final text = _netAmountController.text.trim();
+  double? _getGrossAmount() {
+    final text = _grossAmountController.text.trim();
     return text.isEmpty ? null : double.tryParse(text);
   }
 
@@ -128,26 +136,30 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
     setState(() => _isSaving = true);
 
     try {
-      final netAmount = double.parse(_netAmountController.text.trim());
-      final vatAmount = _vatCalculation?.vatAmount ?? 0.0;
-      final totalAmount = netAmount + vatAmount;
+      final grossAmount = double.parse(_grossAmountController.text.trim());
+      final netAmount = _vatCalculation?.netAmount ?? grossAmount;
 
       final invoice = Invoice(
         id: '0', // Will be assigned by backend
         clientName: _clientNameController.text.trim(),
-        amount: totalAmount, // Use gross amount for compatibility
+        amount: grossAmount, // Use gross amount for compatibility
         date: _selectedDate,
         dueDate: _selectedDate.add(const Duration(days: 30)), // Set due date 30 days from invoice date
         description: _descriptionController.text.trim(),
         status: _selectedStatus,
         invoiceNumber: '', // Will be assigned by backend
         createdAt: DateTime.now(),
+        // VAT fields
+        vatRateId: _selectedVATRate?.id,
+        netAmount: _vatCalculation?.netAmount ?? netAmount,
+        vatAmount: _vatCalculation?.vatAmount,
+        grossAmount: _vatCalculation?.grossAmount ?? grossAmount,
       );
 
       debugPrint('💰 [AddEnhancedInvoiceDialog] Starting invoice save...');
+      debugPrint('💰 Gross: ${_getCurrencySymbol()}${grossAmount.toStringAsFixed(2)}');
       debugPrint('💰 Net: ${_getCurrencySymbol()}${netAmount.toStringAsFixed(2)}');
-      debugPrint('💰 VAT: ${_getCurrencySymbol()}${vatAmount.toStringAsFixed(2)}');
-      debugPrint('💰 Total: ${_getCurrencySymbol()}${totalAmount.toStringAsFixed(2)}');
+      debugPrint('💰 VAT: ${_getCurrencySymbol()}${(_vatCalculation?.vatAmount ?? 0.0).toStringAsFixed(2)}');
 
       await _dbService.insertInvoice(invoice);
       debugPrint('💰 [AddEnhancedInvoiceDialog] Invoice save completed successfully');
@@ -291,16 +303,18 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
                       ),
                       const SizedBox(height: 16),
 
+                      // Gross Amount and VAT Rate Row
                       Row(
                         children: [
                           Expanded(
                             child: TextFormField(
-                              controller: _netAmountController,
+                              controller: _grossAmountController,
                               decoration: InputDecoration(
-                                labelText: 'Net Amount (ex VAT)',
+                                labelText: 'Gross Amount (inc VAT)',
                                 border: const OutlineInputBorder(),
                                 prefixIcon: const Icon(Icons.euro),
                                 prefixText: _getCurrencySymbol(),
+                                helperText: 'Total amount including VAT',
                               ),
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -332,6 +346,7 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
                                       labelText: 'VAT Rate',
                                       border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.percent),
+                                      helperText: 'Ireland VAT rate',
                                     ),
                                     items: _vatRates
                                         .map((rate) => DropdownMenuItem(
@@ -355,9 +370,25 @@ class _AddEnhancedInvoiceDialogState extends State<AddEnhancedInvoiceDialog> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      // Net Amount Field (Read-only, calculated from VAT)
+                      TextFormField(
+                        controller: _netAmountController,
+                        decoration: InputDecoration(
+                          labelText: 'Net Amount (ex VAT)',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.receipt),
+                          prefixText: _getCurrencySymbol(),
+                          helperText: 'Calculated automatically from gross amount',
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        readOnly: true,
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                      const SizedBox(height: 16),
 
-                      VATCalculatorWidget(
-                        netAmount: _getNetAmount(),
+                      GrossVATCalculatorWidget(
+                        grossAmount: _getGrossAmount(),
                         selectedVATRate: _selectedVATRate,
                         businessUsagePercentage: 100.0, // Invoices are always 100% business
                         onCalculationChanged: _onVATCalculationChanged,

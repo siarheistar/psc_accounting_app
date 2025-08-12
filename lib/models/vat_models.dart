@@ -26,17 +26,23 @@ class VATRate {
       id: json['id'],
       country: json['country'],
       rateName: json['rate_name'],
-      ratePercentage: (json['rate_percentage'] as num).toDouble(),
+      ratePercentage: _parseDouble(json['rate_percentage']),
       description: json['description'],
       isActive: json['is_active'] ?? true,
       effectiveFrom: DateTime.parse(json['effective_from']),
-      effectiveUntil: json['effective_until'] != null 
-          ? DateTime.parse(json['effective_until']) 
+      effectiveUntil: json['effective_until'] != null
+          ? DateTime.parse(json['effective_until'])
           : null,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : null,
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.parse(value);
+    throw ArgumentError('Cannot parse $value as double');
   }
 
   Map<String, dynamic> toJson() {
@@ -86,12 +92,13 @@ class ExpenseCategory {
       categoryType: json['category_type'],
       defaultVatRateId: json['default_vat_rate_id'],
       supportsBusinessUsage: json['supports_business_usage'] ?? false,
-      defaultBusinessUsage: (json['default_business_usage'] as num?)?.toDouble() ?? 100.0,
+      defaultBusinessUsage:
+          (json['default_business_usage'] as num?)?.toDouble() ?? 100.0,
       requiresReceipt: json['requires_receipt'] ?? true,
       description: json['description'],
       isActive: json['is_active'] ?? true,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : null,
     );
   }
@@ -164,9 +171,8 @@ class ExpenseCategoryData {
       categories: (json['categories'] as List)
           .map((e) => ExpenseCategory.fromJson(e))
           .toList(),
-      vatRates: (json['vat_rates'] as List)
-          .map((e) => VATRate.fromJson(e))
-          .toList(),
+      vatRates:
+          (json['vat_rates'] as List).map((e) => VATRate.fromJson(e)).toList(),
       businessUsageOptions: (json['business_usage_options'] as List)
           .map((e) => BusinessUsageOption.fromJson(e))
           .toList(),
@@ -198,7 +204,8 @@ class VATCalculation {
       vatAmount: (json['vat_amount'] as num).toDouble(),
       grossAmount: (json['gross_amount'] as num).toDouble(),
       deductibleAmount: (json['deductible_amount'] as num?)?.toDouble(),
-      businessUsagePercentage: (json['business_usage_percentage'] as num?)?.toDouble(),
+      businessUsagePercentage:
+          (json['business_usage_percentage'] as num?)?.toDouble(),
     );
   }
 
@@ -273,7 +280,8 @@ class EnhancedExpense {
       vatAmount: (json['vat_amount'] as num).toDouble(),
       grossAmount: (json['gross_amount'] as num).toDouble(),
       supplierName: json['supplier_name'],
-      businessUsagePercentage: (json['business_usage_percentage'] as num?)?.toDouble() ?? 100.0,
+      businessUsagePercentage:
+          (json['business_usage_percentage'] as num?)?.toDouble() ?? 100.0,
       deductibleAmount: (json['deductible_amount'] as num).toDouble(),
       expenseType: json['expense_type'] ?? 'general',
       eworkerDays: (json['eworker_days'] as num?)?.toDouble(),
@@ -283,8 +291,8 @@ class EnhancedExpense {
       notes: json['notes'],
       receiptRequired: json['receipt_required'] ?? true,
       paid: json['paid'] ?? false,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : null,
       categoryName: json['category_name'],
       vatRateName: json['vat_rate_name'],
@@ -326,8 +334,8 @@ class EWorkerPeriod {
       dailyRate: (json['daily_rate'] as num).toDouble(),
       totalAmount: (json['total_amount'] as num).toDouble(),
       status: json['status'] ?? 'draft',
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : null,
     );
   }

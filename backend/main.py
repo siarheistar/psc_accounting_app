@@ -128,6 +128,11 @@ class Invoice(BaseModel):
     status: str = "pending"
     description: Optional[str] = None
     created_at: Optional[str] = None
+    # VAT fields
+    vat_rate_id: Optional[int] = None
+    net_amount: Optional[float] = None
+    vat_amount: Optional[float] = None
+    gross_amount: Optional[float] = None
 
 class Expense(BaseModel):
     id: Optional[int] = None
@@ -138,6 +143,11 @@ class Expense(BaseModel):
     category: str
     status: str = "pending"
     notes: Optional[str] = None
+    # VAT fields
+    vat_rate: Optional[float] = None
+    vat_amount: Optional[float] = None
+    net_amount: Optional[float] = None
+    gross_amount: Optional[float] = None
 
 class PayrollEntry(BaseModel):
     id: Optional[int] = None
@@ -621,7 +631,8 @@ async def get_invoices(company_id: str = Query(..., description="Company ID")):
     
     try:
         query = """
-        SELECT id, company_id, client_name, amount, date, due_date, status, created_at
+        SELECT id, company_id, client_name, amount, date, due_date, status, created_at, invoice_number, description,
+               vat_rate_id, net_amount, vat_amount, gross_amount
         FROM public.invoices 
         WHERE company_id = %s
         ORDER BY created_at DESC
@@ -634,17 +645,23 @@ async def get_invoices(company_id: str = Query(..., description="Company ID")):
             invoice = {
                 "id": str(row['id']),
                 "company_id": str(row['company_id']),
-                "invoice_number": f"INV-{row['id']:04d}",  # Generate invoice number from ID for now
+                "invoice_number": row.get('invoice_number') or f"INV-{row['id']:04d}",  # Use stored number or generate from ID
                 "client_name": row['client_name'],  # Use actual column name
                 "amount": float(row['amount']) if row['amount'] else 0.0,
                 "date": row['date'].isoformat() if row['date'] else None,
                 "due_date": row['due_date'].isoformat() if row['due_date'] else None,
                 "status": row['status'] or 'pending',
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                "description": row.get('description'),
+                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                # VAT fields
+                "vatRateId": row.get('vat_rate_id'),
+                "netAmount": float(row['net_amount']) if row.get('net_amount') else None,
+                "vatAmount": float(row['vat_amount']) if row.get('vat_amount') else None,
+                "grossAmount": float(row['gross_amount']) if row.get('gross_amount') else None,
             }
             invoices.append(invoice)
         
-        print(f"📊 [Backend] Returning {len(invoices)} invoices")
+        print(f"📊 [Backend] Returning {len(invoices)} invoices with VAT data")
         return invoices
         
     except Exception as e:
@@ -658,14 +675,28 @@ async def get_expenses(company_id: str = Query(..., description="Company ID")):
     print(f"💰 [Backend] Getting expenses for company: {company_id}")
     
     try:
-        query = """
-        SELECT id, company_id, description, amount, date, category, created_at
-        FROM public.expenses 
-        WHERE company_id = %s
-        ORDER BY created_at DESC
-        """
-        
-        result = execute_query(query, (int(company_id),), fetch=True)
+        # First try with VAT fields, fallback to basic fields if columns don't exist
+        try:
+            query = """
+            SELECT id, company_id, description, amount, date, category, created_at, status, notes,
+                   vat_rate, vat_amount, net_amount, gross_amount
+            FROM public.expenses 
+            WHERE company_id = %s
+            ORDER BY created_at DESC
+            """
+            result = execute_query(query, (int(company_id),), fetch=True)
+            has_vat_columns = True
+        except Exception as vat_error:
+            print(f"⚠️ [Backend] VAT columns not found, falling back to basic query: {vat_error}")
+            # Fallback to basic query without VAT columns
+            query = """
+            SELECT id, company_id, description, amount, date, category, created_at
+            FROM public.expenses 
+            WHERE company_id = %s
+            ORDER BY created_at DESC
+            """
+            result = execute_query(query, (int(company_id),), fetch=True)
+            has_vat_columns = False
         
         expenses = []
         for row in result or []:
@@ -676,11 +707,33 @@ async def get_expenses(company_id: str = Query(..., description="Company ID")):
                 "description": row['description'],
                 "category": row['category'],
                 "amount": float(row['amount']) if row['amount'] else 0.0,
-                "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                "created_at": row['created_at'].isoformat() if row['created_at'] else None,
             }
+            
+            # Add VAT fields only if columns exist
+            if has_vat_columns:
+                expense.update({
+                    "status": row.get('status', 'pending'),
+                    "notes": row.get('notes'),
+                    "vatRate": float(row['vat_rate']) if row.get('vat_rate') else None,
+                    "vatAmount": float(row['vat_amount']) if row.get('vat_amount') else None,
+                    "netAmount": float(row['net_amount']) if row.get('net_amount') else None,
+                    "grossAmount": float(row['gross_amount']) if row.get('gross_amount') else None,
+                })
+            else:
+                # Default values for missing columns
+                expense.update({
+                    "status": "pending",
+                    "notes": None,
+                    "vatRate": None,
+                    "vatAmount": None,
+                    "netAmount": None,
+                    "grossAmount": None,
+                })
+            
             expenses.append(expense)
         
-        print(f"📊 [Backend] Returning {len(expenses)} expenses")
+        print(f"📊 [Backend] Returning {len(expenses)} expenses (VAT columns: {has_vat_columns})")
         return expenses
         
     except Exception as e:
@@ -1330,11 +1383,12 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
     print(f"📄 [Backend] Invoice data: {invoice_data}")
     
     try:
-        # Insert new invoice
+        # Insert new invoice with VAT fields
         insert_query = """
         INSERT INTO public.invoices 
-        (company_id, client_name, amount, date, due_date, status, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+        (company_id, client_name, amount, date, due_date, status, invoice_number, description, created_at, updated_at,
+         vat_rate_id, net_amount, vat_amount, gross_amount)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s, %s)
         RETURNING id
         """
         
@@ -1344,12 +1398,20 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
             float(invoice_data.get('amount', 0)),
             invoice_data.get('date'),
             invoice_data.get('due_date'),
-            invoice_data.get('status', 'pending')
+            invoice_data.get('status', 'pending'),
+            invoice_data.get('invoice_number'),
+            invoice_data.get('description'),
+            # VAT fields
+            invoice_data.get('vat_rate_id'),
+            float(invoice_data.get('net_amount', 0)) if invoice_data.get('net_amount') else None,
+            float(invoice_data.get('vat_amount', 0)) if invoice_data.get('vat_amount') else None,
+            float(invoice_data.get('gross_amount', 0)) if invoice_data.get('gross_amount') else None
         ), fetch=True)
         
         # Handle the result properly - it's a tuple when using RETURNING
         invoice_id = result[0] if result and len(result) > 0 else None
-        print(f"✅ [Backend] Invoice created with ID: {invoice_id}")
+        print(f"✅ [Backend] Invoice created with ID: {invoice_id} with VAT data")
+        print(f"📊 [Backend] VAT breakdown - Net: {invoice_data.get('net_amount')}, VAT: {invoice_data.get('vat_amount')}, Gross: {invoice_data.get('gross_amount')}")
         return {"id": invoice_id, "message": "Invoice created successfully"}
         
     except Exception as e:
@@ -1364,11 +1426,12 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
     print(f"💰 [Backend] Expense data: {expense_data}")
     
     try:
-        # Insert new expense
+        # Insert new expense with VAT fields
         insert_query = """
         INSERT INTO public.expenses 
-        (company_id, description, category, amount, date, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+        (company_id, description, category, amount, date, status, notes, created_at, updated_at,
+         vat_rate, vat_amount, net_amount, gross_amount)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s, %s)
         RETURNING id
         """
         
@@ -1377,12 +1440,20 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
             expense_data.get('description'),
             expense_data.get('category'),
             float(expense_data.get('amount', 0)),
-            expense_data.get('date')
+            expense_data.get('date'),
+            expense_data.get('status', 'pending'),
+            expense_data.get('notes'),
+            # VAT fields
+            float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None,
+            float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None,
+            float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None,
+            float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None
         ), fetch=True)
         
         # Handle the result properly - it's a tuple when using RETURNING
         expense_id = result[0] if result and len(result) > 0 else None
-        print(f"✅ [Backend] Expense created with ID: {expense_id}")
+        print(f"✅ [Backend] Expense created with ID: {expense_id} with VAT data")
+        print(f"📊 [Backend] VAT breakdown - Net: {expense_data.get('net_amount')}, VAT: {expense_data.get('vat_amount')}, Gross: {expense_data.get('gross_amount')}")
         return {"id": expense_id, "message": "Expense created successfully"}
         
     except Exception as e:
@@ -1573,10 +1644,11 @@ async def update_invoice(invoice_id: int, invoice_data: dict, company_id: str = 
             print(f"❌ [Backend] Invoice {invoice_id} not found for company {company_id}")
             raise HTTPException(status_code=404, detail="Invoice not found")
         
-        # Update the invoice
+        # Update the invoice with VAT fields
         update_query = """
         UPDATE public.invoices 
-        SET client_name = %s, amount = %s, date = %s, due_date = %s, status = %s, updated_at = CURRENT_TIMESTAMP
+        SET client_name = %s, amount = %s, date = %s, due_date = %s, status = %s, invoice_number = %s, description = %s,
+            vat_rate_id = %s, net_amount = %s, vat_amount = %s, gross_amount = %s, updated_at = CURRENT_TIMESTAMP
         WHERE id = %s AND company_id = %s
         """
         
@@ -1586,11 +1658,19 @@ async def update_invoice(invoice_id: int, invoice_data: dict, company_id: str = 
             invoice_data.get('date'),
             invoice_data.get('due_date'),
             invoice_data.get('status', 'pending'),
+            invoice_data.get('invoice_number'),
+            invoice_data.get('description'),
+            # VAT fields
+            invoice_data.get('vat_rate_id'),
+            float(invoice_data.get('net_amount', 0)) if invoice_data.get('net_amount') else None,
+            float(invoice_data.get('vat_amount', 0)) if invoice_data.get('vat_amount') else None,
+            float(invoice_data.get('gross_amount', 0)) if invoice_data.get('gross_amount') else None,
             invoice_id,
             int(company_id)
         ), fetch=False)
         
-        print(f"✅ [Backend] Invoice {invoice_id} updated successfully")
+        print(f"✅ [Backend] Invoice {invoice_id} updated successfully with VAT data")
+        print(f"📊 [Backend] VAT breakdown - Net: {invoice_data.get('net_amount')}, VAT: {invoice_data.get('vat_amount')}, Gross: {invoice_data.get('gross_amount')}")
         return {"message": f"Invoice {invoice_id} updated successfully"}
         
     except HTTPException:
@@ -1615,10 +1695,11 @@ async def update_expense(expense_id: int, expense_data: dict, company_id: str = 
             print(f"❌ [Backend] Expense {expense_id} not found for company {company_id}")
             raise HTTPException(status_code=404, detail="Expense not found")
         
-        # Update the expense
+        # Update the expense with VAT fields
         update_query = """
         UPDATE public.expenses 
-        SET description = %s, category = %s, amount = %s, date = %s, updated_at = CURRENT_TIMESTAMP
+        SET description = %s, category = %s, amount = %s, date = %s, status = %s, notes = %s,
+            vat_rate = %s, vat_amount = %s, net_amount = %s, gross_amount = %s, updated_at = CURRENT_TIMESTAMP
         WHERE id = %s AND company_id = %s
         """
         
@@ -1627,11 +1708,19 @@ async def update_expense(expense_id: int, expense_data: dict, company_id: str = 
             expense_data.get('category'),
             float(expense_data.get('amount', 0)),
             expense_data.get('date'),
+            expense_data.get('status', 'pending'),
+            expense_data.get('notes'),
+            # VAT fields
+            float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None,
+            float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None,
+            float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None,
+            float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None,
             expense_id,
             int(company_id)
         ), fetch=False)
         
-        print(f"✅ [Backend] Expense {expense_id} updated successfully")
+        print(f"✅ [Backend] Expense {expense_id} updated successfully with VAT data")
+        print(f"📊 [Backend] VAT breakdown - Net: {expense_data.get('net_amount')}, VAT: {expense_data.get('vat_amount')}, Gross: {expense_data.get('gross_amount')}")
         return {"message": f"Expense {expense_id} updated successfully"}
         
     except HTTPException:

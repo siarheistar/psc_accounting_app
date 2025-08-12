@@ -17,18 +17,78 @@ class VATService {
         'active_only': activeOnly.toString(),
       });
 
+      print('🔍 [VATService] API URL: $uri');
+      print('🔍 [VATService] Base URL: $baseUrl');
+      
       final response = await http.get(uri);
+      
+      print('🔍 [VATService] Response Status: ${response.statusCode}');
+      print('🔍 [VATService] Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => VATRate.fromJson(json)).toList();
+        print('🔍 [VATService] Parsed VAT rates count: ${data.length}');
+        final rates = data.map((json) => VATRate.fromJson(json)).toList();
+        print('🔍 [VATService] VAT rates loaded: ${rates.map((r) => '${r.rateName}(${r.ratePercentage}%)').join(', ')}');
+        return rates;
       } else {
-        throw Exception('Failed to load VAT rates: ${response.statusCode}');
+        throw Exception('Failed to load VAT rates: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('Error loading VAT rates: $e');
-      return [];
+      print('❌ [VATService] Error loading VAT rates: $e');
+      print('❌ [VATService] Error type: ${e.runtimeType}');
+      print('🔄 [VATService] Falling back to local Ireland VAT rates...');
+      return _getLocalIrelandVATRates();
     }
+  }
+
+  /// Fallback Ireland VAT rates when API is not available
+  static List<VATRate> _getLocalIrelandVATRates() {
+    print('📊 [VATService] Using local fallback Ireland VAT rates');
+    return [
+      VATRate(
+        id: 1,
+        country: 'Ireland',
+        rateName: 'Standard',
+        ratePercentage: 23.00,
+        effectiveFrom: DateTime.now(),
+      ),
+      VATRate(
+        id: 2,
+        country: 'Ireland',
+        rateName: 'Reduced',
+        ratePercentage: 13.50,
+        effectiveFrom: DateTime.now(),
+      ),
+      VATRate(
+        id: 3,
+        country: 'Ireland',
+        rateName: 'Second Reduced',
+        ratePercentage: 9.00,
+        effectiveFrom: DateTime.now(),
+      ),
+      VATRate(
+        id: 4,
+        country: 'Ireland',
+        rateName: 'Zero',
+        ratePercentage: 0.00,
+        effectiveFrom: DateTime.now(),
+      ),
+      VATRate(
+        id: 5,
+        country: 'Ireland',
+        rateName: 'Exempt',
+        ratePercentage: 0.00,
+        effectiveFrom: DateTime.now(),
+      ),
+      VATRate(
+        id: 6,
+        country: 'Ireland',
+        rateName: 'Home Office',
+        ratePercentage: 0.00,
+        effectiveFrom: DateTime.now(),
+      ),
+    ];
   }
 
   /// Get expense categories with VAT rates and business usage options
