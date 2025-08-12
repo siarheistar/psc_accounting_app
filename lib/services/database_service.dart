@@ -1,30 +1,24 @@
 import 'dart:convert';
-import 'dart:io';
+// import 'dart:io';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../models/accounting_models.dart';
-import '../screens/company_creation_page.dart';
+// import '../screens/company_creation_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'api_config.dart';
 
 class DatabaseService {
   // Your PostgreSQL connection details
-  static const String _host = 'pscdb.cnacsqi4u8qw.eu-west-1.rds.amazonaws.com';
-  static const String _port = '5432';
-  static const String _database = 'pscdb';
-  static const String _username = 'postgres';
+  // Legacy DB constants (unused with HTTP API). Keeping for reference.
+  // static const String _host = 'pscdb.cnacsqi4u8qw.eu-west-1.rds.amazonaws.com';
+  // static const String _port = '5432';
+  // static const String _database = 'pscdb';
+  // static const String _username = 'postgres';
 
   // For production, deploy the backend API and use that URL
   // For development, we need to handle Flutter web's specific requirements
-  static String get _baseUrl {
-    if (kIsWeb) {
-      // For Flutter web, backend API is on port 8000 (no /api prefix)
-      return 'http://localhost:8000';
-    } else {
-      // For mobile emulator
-      return 'http://10.0.2.2:8000';
-    }
-  }
+  static String get _baseUrl => ApiConfig.baseUrl;
 
   // In production, replace with your deployed API URL:
   // static const String _baseUrl = 'https://your-api-domain.com/api';

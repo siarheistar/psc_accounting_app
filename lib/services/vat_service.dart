@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../services/api_service.dart';
+import '../services/api_config.dart';
 import '../models/vat_models.dart';
 
 class VATService {
-  static const String baseUrl = ApiService.baseUrl;
+  static String get baseUrl => ApiConfig.baseUrl;
 
   /// Get VAT rates for a specific country
   static Future<List<VATRate>> getVATRates({
@@ -41,7 +41,8 @@ class VATService {
         final Map<String, dynamic> data = json.decode(response.body);
         return ExpenseCategoryData.fromJson(data);
       } else {
-        throw Exception('Failed to load expense categories: ${response.statusCode}');
+        throw Exception(
+            'Failed to load expense categories: ${response.statusCode}');
       }
     } catch (e) {
       print('Error loading expense categories: $e');
@@ -73,7 +74,8 @@ class VATService {
         queryParams['vat_rate_percentage'] = vatRatePercentage.toString();
       }
 
-      final uri = Uri.parse('$baseUrl/vat/calculate').replace(queryParameters: queryParams);
+      final uri = Uri.parse('$baseUrl/vat/calculate')
+          .replace(queryParameters: queryParams);
       final response = await http.post(uri);
 
       if (response.statusCode == 200) {
@@ -108,7 +110,8 @@ class VATService {
         queryParams['vat_rate_percentage'] = vatRatePercentage.toString();
       }
 
-      final uri = Uri.parse('\$baseUrl/vat/calculate-from-gross').replace(queryParameters: queryParams);
+      final uri = Uri.parse('$baseUrl/vat/calculate-from-gross')
+          .replace(queryParameters: queryParams);
       final response = await http.post(uri);
 
       if (response.statusCode == 200) {
@@ -123,7 +126,7 @@ class VATService {
         );
       }
     } catch (e) {
-      print('Error calculating VAT from gross: \$e');
+      print('Error calculating VAT from gross: $e');
       // Fallback to local calculation
       return _calculateVATFromGrossLocally(
         grossAmount: grossAmount,
@@ -144,7 +147,7 @@ class VATService {
     final netAmount = grossAmount / (1 + vatRatePercentage / 100);
     final vatAmount = grossAmount - netAmount;
     final deductibleAmount = vatAmount * businessUsagePercentage / 100;
-    
+
     return VATCalculation(
       netAmount: netAmount,
       vatAmount: vatAmount,
@@ -173,7 +176,7 @@ class VATService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl/expenses/enhanced');
-      
+
       final body = {
         'company_id': companyId,
         'expense_date': expenseDate,
@@ -202,7 +205,8 @@ class VATService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to create expense: ${response.statusCode}\n${response.body}');
+        throw Exception(
+            'Failed to create expense: ${response.statusCode}\n${response.body}');
       }
     } catch (e) {
       print('Error creating enhanced expense: $e');
@@ -211,7 +215,8 @@ class VATService {
   }
 
   /// Get enhanced expenses for a company
-  static Future<List<EnhancedExpense>> getEnhancedExpenses(String companyId) async {
+  static Future<List<EnhancedExpense>> getEnhancedExpenses(
+      String companyId) async {
     try {
       final uri = Uri.parse('$baseUrl/expenses/enhanced/$companyId');
       final response = await http.get(uri);
@@ -220,7 +225,8 @@ class VATService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => EnhancedExpense.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load enhanced expenses: ${response.statusCode}');
+        throw Exception(
+            'Failed to load enhanced expenses: ${response.statusCode}');
       }
     } catch (e) {
       print('Error loading enhanced expenses: $e');
@@ -238,7 +244,7 @@ class VATService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl/eworker/period');
-      
+
       final body = {
         'company_id': companyId,
         'period_start': periodStart,
@@ -256,7 +262,8 @@ class VATService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to create e-worker period: ${response.statusCode}\n${response.body}');
+        throw Exception(
+            'Failed to create e-worker period: ${response.statusCode}\n${response.body}');
       }
     } catch (e) {
       print('Error creating e-worker period: $e');
@@ -274,7 +281,8 @@ class VATService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => EWorkerPeriod.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load e-worker periods: ${response.statusCode}');
+        throw Exception(
+            'Failed to load e-worker periods: ${response.statusCode}');
       }
     } catch (e) {
       print('Error loading e-worker periods: $e');
@@ -289,7 +297,8 @@ class VATService {
     required String endDate,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/vat/summary/$companyId').replace(queryParameters: {
+      final uri = Uri.parse('$baseUrl/vat/summary/$companyId')
+          .replace(queryParameters: {
         'start_date': startDate,
         'end_date': endDate,
       });

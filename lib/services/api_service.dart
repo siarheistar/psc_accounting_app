@@ -1,9 +1,10 @@
 // lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000'; // FastAPI backend URL
+  static String get baseUrl => ApiConfig.baseUrl; // FastAPI backend URL
 
   // Invoice methods
   static Future<List<Map<String, dynamic>>> getInvoices(

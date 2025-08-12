@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
+import '../services/api_config.dart';
 
 import '../services/database_service.dart';
 import '../context/simple_company_context.dart';
@@ -345,7 +346,7 @@ class _HomePageState extends State<HomePage> {
 
     try {
       // Use the new multipart form upload to the refactored attachment system
-      final uri = Uri.parse('http://localhost:8000/attachments/upload').replace(
+      final uri = Uri.parse('${ApiConfig.baseUrl}/attachments/upload').replace(
         queryParameters: {
           'entity_type': entityType,
           'entity_id': entityId,
@@ -510,7 +511,7 @@ class _HomePageState extends State<HomePage> {
     try {
       // Use the new attachment listing endpoint
       final url =
-          Uri.parse('http://localhost:8000/attachments/$entityType/$entityId');
+          Uri.parse('${ApiConfig.baseUrl}/attachments/$entityType/$entityId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
@@ -564,7 +565,7 @@ class _HomePageState extends State<HomePage> {
 
       // Use the new attachment download endpoint
       final url =
-          Uri.parse('http://localhost:8000/attachments/download/$documentId');
+          Uri.parse('${ApiConfig.baseUrl}/attachments/download/$documentId');
       final response = await http.get(
         url.replace(queryParameters: {
           'company_id': _dbService.currentCompanyId ?? '1'
