@@ -136,7 +136,8 @@ class Expense {
   final String status;
   final String? receipt;
   final String? notes;
-  final double? vatRate;
+  final double? vatRate; // Legacy field for backward compatibility
+  final int? vatRateId; // New VAT rate ID field
   final double? vatAmount;
   final double? grossAmount;
   final double? netAmount;
@@ -152,6 +153,7 @@ class Expense {
     this.receipt,
     this.notes,
     this.vatRate,
+    this.vatRateId,
     this.vatAmount,
     this.grossAmount,
     this.netAmount,
@@ -173,6 +175,9 @@ class Expense {
       notes: json['notes'],
       vatRate: json['vat_rate'] != null
           ? double.tryParse(json['vat_rate'].toString())
+          : null,
+      vatRateId: json['vat_rate_id'] != null
+          ? int.tryParse(json['vat_rate_id'].toString())
           : null,
       vatAmount: json['vat_amount'] != null
           ? double.tryParse(json['vat_amount'].toString())
@@ -200,6 +205,7 @@ class Expense {
       'receipt': receipt,
       'notes': notes,
       'vat_rate': vatRate,
+      'vat_rate_id': vatRateId,
       'vat_amount': vatAmount,
       'gross_amount': grossAmount,
       'net_amount': netAmount,

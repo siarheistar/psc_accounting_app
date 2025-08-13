@@ -49,6 +49,11 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
     print('💰 [EditExpenseDialog] - Date: ${widget.expense.date}');
     print('💰 [EditExpenseDialog] - Status: ${widget.expense.status}');
     print('💰 [EditExpenseDialog] - Notes: ${widget.expense.notes}');
+    print('💰 [EditExpenseDialog] - VAT Rate: ${widget.expense.vatRate}%');
+    print('💰 [EditExpenseDialog] - VAT Rate ID: ${widget.expense.vatRateId}');
+    print('💰 [EditExpenseDialog] - Net Amount: ${widget.expense.netAmount}');
+    print('💰 [EditExpenseDialog] - VAT Amount: ${widget.expense.vatAmount}');
+    print('💰 [EditExpenseDialog] - Gross Amount: ${widget.expense.grossAmount}');
     _initializeCompanyContext();
     _loadData();
     _loadVATRates();
@@ -91,17 +96,95 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
       setState(() {
         _vatRates = rates;
         _isLoadingVATRates = false;
-        // Try to set VAT rate based on existing expense VAT rate
-        if (widget.expense.vatRate != null) {
+        // Load the actual VAT rate from the expense data
+        if (widget.expense.vatRateId != null) {
+          print(
+              '💰 [EditExpenseDialog] Looking for VAT rate ID: ${widget.expense.vatRateId}');
+          print('💰 [EditExpenseDialog] Available VAT rates:');
+          for (var rate in rates) {
+            print(
+                '💰 [EditExpenseDialog] - ID: ${rate.id}, Name: ${rate.rateName}, Rate: ${rate.ratePercentage}%');
+          }
+
           _selectedVATRate = rates.firstWhere(
-            (rate) => rate.ratePercentage == widget.expense.vatRate,
-            orElse: () => rates.isNotEmpty ? rates.first : VATRate(id: 0, country: '', rateName: '', ratePercentage: 0, effectiveFrom: DateTime.now()),
+            (rate) => rate.id == widget.expense.vatRateId,
+            orElse: () {
+              print(
+                  '💰 [EditExpenseDialog] ❌ VAT rate ID ${widget.expense.vatRateId} not found in available rates!');
+              return rates.isNotEmpty ? rates.first : rates.first;
+            },
           );
+          print(
+              '💰 [EditExpenseDialog] ✅ Loaded VAT rate from expense: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%) - ID: ${widget.expense.vatRateId}');
+        } else {
+          // Fallback to vatRate percentage for backward compatibility
+          if (widget.expense.vatRate != null) {
+            print(
+                '💰 [EditExpenseDialog] Fallback: Looking for VAT rate percentage: ${widget.expense.vatRate}%');
+            _selectedVATRate = rates.firstWhere(
+              (rate) => rate.ratePercentage == widget.expense.vatRate,
+              orElse: () {
+                print(
+                    '💰 [EditExpenseDialog] ❌ VAT rate percentage ${widget.expense.vatRate}% not found in available rates!');
+                return rates.isNotEmpty ? rates.first : rates.first;
+              },
+            );
+            print(
+                '💰 [EditExpenseDialog] ✅ Loaded VAT rate from percentage: ${_selectedVATRate?.rateName} (${_selectedVATRate?.ratePercentage}%)');
+          } else {
+            // If no VAT rate in expense, don't select any (let user choose)
+            _selectedVATRate = null;
+            print(
+                '💰 [EditExpenseDialog] No VAT rate in expense data, user must select one');
+          }
         }
       });
+
+      // Trigger initial VAT calculation after rates are loaded
+      if (_selectedVATRate != null) {
+        _triggerVATCalculation();
+        // Force immediate calculation to ensure VAT breakdown shows
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedVATRate != null) {
+            _triggerVATCalculation();
+          }
+        });
+      }
+
+      // Initialize VAT calculation from existing expense data if available
+      if (widget.expense.netAmount != null &&
+          widget.expense.vatAmount != null &&
+          widget.expense.grossAmount != null) {
+        _vatCalculation = VATCalculation(
+          grossAmount: widget.expense.grossAmount!,
+          netAmount: widget.expense.netAmount!,
+          vatAmount: widget.expense.vatAmount!,
+          vatRatePercentage: _selectedVATRate?.ratePercentage ?? 0.0,
+          businessUsagePercentage: 100.0,
+        );
+        print(
+            '💰 [EditExpenseDialog] Initialized VAT calculation from existing data: gross=€${widget.expense.grossAmount}, net=€${widget.expense.netAmount}, vat=€${widget.expense.vatAmount}');
+      }
     } catch (e) {
       setState(() => _isLoadingVATRates = false);
       print('Error loading VAT rates: $e');
+    }
+  }
+
+  void _triggerVATCalculation() {
+    // This will cause the GrossVATCalculatorWidget to recalculate
+    // when grossAmount and selectedVATRate are both available
+    final grossAmount = _getGrossAmount();
+    if (grossAmount != null && _selectedVATRate != null) {
+      print(
+          '💰 [EditExpenseDialog] Triggering VAT calculation: gross=€$grossAmount, rate=${_selectedVATRate?.ratePercentage}%');
+      print(
+          '💰 [EditExpenseDialog] VAT Rate Details: ${_selectedVATRate?.rateName} (ID: ${_selectedVATRate?.id})');
+      // The calculation will be triggered automatically by the widget
+      // when it receives the updated grossAmount and selectedVATRate
+    } else {
+      print(
+          '💰 [EditExpenseDialog] Cannot trigger VAT calculation: grossAmount=$grossAmount, vatRate=$_selectedVATRate');
     }
   }
 
@@ -253,7 +336,8 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
         status: widget.expense.status, // Keep existing status
         notes: _notesController.text,
         // VAT fields
-        vatRate: _selectedVATRate?.ratePercentage,
+        vatRate: _selectedVATRate?.ratePercentage, // Keep for backward compatibility
+        vatRateId: _selectedVATRate?.id,
         vatAmount: _vatCalculation?.vatAmount,
         netAmount: _vatCalculation?.netAmount ?? netAmount,
         grossAmount: _vatCalculation?.grossAmount ?? grossAmount,
@@ -454,6 +538,8 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
                                 setState(() {
                                   _selectedVATRate = value;
                                 });
+                                // Trigger VAT calculation when rate changes
+                                _triggerVATCalculation();
                               },
                             ),
                     ),

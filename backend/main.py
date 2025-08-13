@@ -679,7 +679,7 @@ async def get_expenses(company_id: str = Query(..., description="Company ID")):
         try:
             query = """
             SELECT id, company_id, description, amount, date, category, created_at, status, notes,
-                   vat_rate, vat_amount, net_amount, gross_amount
+                   vat_rate, vat_rate_id, vat_amount, net_amount, gross_amount
             FROM public.expenses 
             WHERE company_id = %s
             ORDER BY created_at DESC
@@ -699,7 +699,17 @@ async def get_expenses(company_id: str = Query(..., description="Company ID")):
             has_vat_columns = False
         
         expenses = []
+        
+        print(f"🔍 [Backend] === EXPENSE GET DEBUG ===")
+        print(f"🔍 [Backend] Query returned {len(result or [])} rows")
+        print(f"🔍 [Backend] Has VAT columns: {has_vat_columns}")
+        
         for row in result or []:
+            print(f"🔍 [Backend] Processing expense row - ID: {row.get('id')}")
+            print(f"🔍 [Backend] Raw row data: {dict(row)}")
+            print(f"🔍 [Backend] VAT Rate ID from DB: '{row.get('vat_rate_id')}'")
+            print(f"🔍 [Backend] VAT Rate from DB: '{row.get('vat_rate')}'")
+            
             expense = {
                 "id": str(row['id']),
                 "company_id": str(row['company_id']),
@@ -715,23 +725,28 @@ async def get_expenses(company_id: str = Query(..., description="Company ID")):
                 expense.update({
                     "status": row.get('status', 'pending'),
                     "notes": row.get('notes'),
-                    "vatRate": float(row['vat_rate']) if row.get('vat_rate') else None,
-                    "vatAmount": float(row['vat_amount']) if row.get('vat_amount') else None,
-                    "netAmount": float(row['net_amount']) if row.get('net_amount') else None,
-                    "grossAmount": float(row['gross_amount']) if row.get('gross_amount') else None,
+                    "vat_rate": float(row['vat_rate']) if row.get('vat_rate') else None,
+                    "vat_rate_id": int(row['vat_rate_id']) if row.get('vat_rate_id') else None,
+                    "vat_amount": float(row['vat_amount']) if row.get('vat_amount') else None,
+                    "net_amount": float(row['net_amount']) if row.get('net_amount') else None,
+                    "gross_amount": float(row['gross_amount']) if row.get('gross_amount') else None,
                 })
             else:
                 # Default values for missing columns
                 expense.update({
                     "status": "pending",
                     "notes": None,
-                    "vatRate": None,
-                    "vatAmount": None,
-                    "netAmount": None,
-                    "grossAmount": None,
+                    "vat_rate": None,
+                    "vat_rate_id": None,
+                    "vat_amount": None,
+                    "net_amount": None,
+                    "gross_amount": None,
                 })
             
+            print(f"🔍 [Backend] Final expense object: {expense}")
             expenses.append(expense)
+            
+        print(f"🔍 [Backend] === END EXPENSE GET DEBUG ===")
         
         print(f"📊 [Backend] Returning {len(expenses)} expenses (VAT columns: {has_vat_columns})")
         return expenses
@@ -1430,12 +1445,19 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
         insert_query = """
         INSERT INTO public.expenses 
         (company_id, description, category, amount, date, status, notes, created_at, updated_at,
-         vat_rate, vat_amount, net_amount, gross_amount)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s, %s)
+         vat_rate, vat_rate_id, vat_amount, net_amount, gross_amount)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s, %s, %s)
         RETURNING id
         """
         
-        result = execute_query(insert_query, (
+        # Prepare parameters with detailed logging
+        vat_rate_value = float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None
+        vat_rate_id_value = int(expense_data.get('vat_rate_id')) if expense_data.get('vat_rate_id') else None
+        vat_amount_value = float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None
+        net_amount_value = float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None
+        gross_amount_value = float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None
+        
+        parameters = (
             int(company_id),
             expense_data.get('description'),
             expense_data.get('category'),
@@ -1444,15 +1466,35 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
             expense_data.get('status', 'pending'),
             expense_data.get('notes'),
             # VAT fields
-            float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None,
-            float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None,
-            float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None,
-            float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None
-        ), fetch=True)
+            vat_rate_value,
+            vat_rate_id_value,
+            vat_amount_value,
+            net_amount_value,
+            gross_amount_value
+        )
+        
+        print(f"🔍 [Backend] === EXPENSE CREATE DEBUG ===")
+        print(f"🔍 [Backend] Raw expense_data received: {expense_data}")
+        print(f"🔍 [Backend] SQL Query: {insert_query}")
+        print(f"🔍 [Backend] Parameters: {parameters}")
+        print(f"🔍 [Backend] VAT Rate ID from data: '{expense_data.get('vat_rate_id')}' -> {vat_rate_id_value}")
+        print(f"🔍 [Backend] VAT Rate from data: '{expense_data.get('vat_rate')}' -> {vat_rate_value}")
+        print(f"🔍 [Backend] === END EXPENSE CREATE DEBUG ===")
+        
+        result = execute_query(insert_query, parameters, fetch=True)
         
         # Handle the result properly - it's a tuple when using RETURNING
         expense_id = result[0] if result and len(result) > 0 else None
         print(f"✅ [Backend] Expense created with ID: {expense_id} with VAT data")
+        
+        # Verification: Query the database to confirm data was saved
+        if expense_id:
+            verify_query = "SELECT id, vat_rate, vat_rate_id, vat_amount, net_amount, gross_amount FROM public.expenses WHERE id = %s"
+            verify_result = execute_query(verify_query, (expense_id,), fetch=True)
+            if verify_result:
+                print(f"🔍 [Backend] VERIFICATION - Expense {expense_id} saved data: {dict(verify_result[0])}")
+            else:
+                print(f"❌ [Backend] VERIFICATION FAILED - Could not retrieve expense {expense_id}")
         print(f"📊 [Backend] VAT breakdown - Net: {expense_data.get('net_amount')}, VAT: {expense_data.get('vat_amount')}, Gross: {expense_data.get('gross_amount')}")
         return {"id": expense_id, "message": "Expense created successfully"}
         
@@ -1699,11 +1741,18 @@ async def update_expense(expense_id: int, expense_data: dict, company_id: str = 
         update_query = """
         UPDATE public.expenses 
         SET description = %s, category = %s, amount = %s, date = %s, status = %s, notes = %s,
-            vat_rate = %s, vat_amount = %s, net_amount = %s, gross_amount = %s, updated_at = CURRENT_TIMESTAMP
+            vat_rate = %s, vat_rate_id = %s, vat_amount = %s, net_amount = %s, gross_amount = %s, updated_at = CURRENT_TIMESTAMP
         WHERE id = %s AND company_id = %s
         """
         
-        execute_query(update_query, (
+        # Prepare parameters with detailed logging
+        vat_rate_value = float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None
+        vat_rate_id_value = int(expense_data.get('vat_rate_id')) if expense_data.get('vat_rate_id') else None
+        vat_amount_value = float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None
+        net_amount_value = float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None
+        gross_amount_value = float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None
+        
+        parameters = (
             expense_data.get('description'),
             expense_data.get('category'),
             float(expense_data.get('amount', 0)),
@@ -1711,14 +1760,34 @@ async def update_expense(expense_id: int, expense_data: dict, company_id: str = 
             expense_data.get('status', 'pending'),
             expense_data.get('notes'),
             # VAT fields
-            float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None,
-            float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None,
-            float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None,
-            float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None,
+            vat_rate_value,
+            vat_rate_id_value,
+            vat_amount_value,
+            net_amount_value,
+            gross_amount_value,
             expense_id,
             int(company_id)
-        ), fetch=False)
+        )
         
+        print(f"🔍 [Backend] === EXPENSE UPDATE DEBUG ===")
+        print(f"🔍 [Backend] Raw expense_data received: {expense_data}")
+        print(f"🔍 [Backend] SQL Query: {update_query}")
+        print(f"🔍 [Backend] Parameters: {parameters}")
+        print(f"🔍 [Backend] VAT Rate ID from data: '{expense_data.get('vat_rate_id')}' -> {vat_rate_id_value}")
+        print(f"🔍 [Backend] VAT Rate from data: '{expense_data.get('vat_rate')}' -> {vat_rate_value}")
+        print(f"🔍 [Backend] Expense ID: {expense_id}, Company ID: {company_id}")
+        print(f"🔍 [Backend] === END EXPENSE UPDATE DEBUG ===")
+        
+        execute_query(update_query, parameters, fetch=False)
+        
+        # Verification: Query the database to confirm data was updated
+        verify_query = "SELECT id, vat_rate, vat_rate_id, vat_amount, net_amount, gross_amount FROM public.expenses WHERE id = %s"
+        verify_result = execute_query(verify_query, (expense_id,), fetch=True)
+        if verify_result:
+            print(f"🔍 [Backend] VERIFICATION - Expense {expense_id} updated data: {dict(verify_result[0])}")
+        else:
+            print(f"❌ [Backend] VERIFICATION FAILED - Could not retrieve expense {expense_id}")
+            
         print(f"✅ [Backend] Expense {expense_id} updated successfully with VAT data")
         print(f"📊 [Backend] VAT breakdown - Net: {expense_data.get('net_amount')}, VAT: {expense_data.get('vat_amount')}, Gross: {expense_data.get('gross_amount')}")
         return {"message": f"Expense {expense_id} updated successfully"}

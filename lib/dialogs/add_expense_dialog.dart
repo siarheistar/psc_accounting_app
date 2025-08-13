@@ -193,12 +193,15 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
             : _notesController.text.trim(),
         // VAT fields
         vatRate: _selectedVATRate?.ratePercentage,
+        vatRateId: _selectedVATRate?.id,
         vatAmount: _vatCalculation?.vatAmount,
         netAmount: _vatCalculation?.netAmount ?? netAmount,
         grossAmount: _vatCalculation?.grossAmount ?? grossAmount,
       );
 
       debugPrint('💰 [AddExpenseDialog] Starting expense save...');
+      debugPrint('💰 [AddExpenseDialog] Expense VAT data: vatRate=${expense.vatRate}%, vatRateId=${expense.vatRateId}');
+      debugPrint('💰 [AddExpenseDialog] Expense amounts: net=${expense.netAmount}, vat=${expense.vatAmount}, gross=${expense.grossAmount}');
       await _dbService.insertExpense(expense);
       debugPrint('💰 [AddExpenseDialog] Expense save completed successfully');
 
