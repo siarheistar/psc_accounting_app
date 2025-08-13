@@ -9,8 +9,9 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "flutter build web"
+    "build": "flutter build web --release --dart-define=API_BASE_URL=https://psc-accounting-backend.onrender.com"
   },
+
   "keywords": [],
   "author": "",
   "license": "ISC",
