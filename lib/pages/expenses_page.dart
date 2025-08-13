@@ -783,28 +783,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Amount',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                ],
-              ),
+              _buildVATBreakdown(expense),
             ],
           ),
           const SizedBox(height: 12),
@@ -930,6 +909,90 @@ class _ExpensesPageState extends State<ExpensesPage> {
         return Colors.red;
       default:
         return Colors.grey;
+    }
+  }
+
+  Widget _buildVATBreakdown(Expense expense) {
+    // Check if we have VAT data
+    final bool hasVATData = expense.grossAmount != null && expense.netAmount != null && expense.vatAmount != null;
+    
+    if (hasVATData) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Amount Breakdown',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Gross Amount (Total)
+          Text(
+            '${_getCurrencySymbol()}${expense.grossAmount!.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Net Amount
+          Text(
+            'Net: ${_getCurrencySymbol()}${expense.netAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          // VAT Amount
+          Text(
+            'VAT: ${_getCurrencySymbol()}${expense.vatAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          // VAT Rate if available
+          if (expense.vatRate != null)
+            Text(
+              '(${expense.vatRate!.toStringAsFixed(1)}%)',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+        ],
+      );
+    } else {
+      // Fallback to original simple amount display
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Amount',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ],
+      );
     }
   }
 }

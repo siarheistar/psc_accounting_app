@@ -1005,44 +1005,99 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Map<String, double> _calculateInvoiceVATMetrics() {
+    double grossTotal = 0.0;
+    double netTotal = 0.0;
+    double vatTotal = 0.0;
+    int count = 0;
+
+    for (final invoice in _invoices) {
+      count++;
+      if (invoice.grossAmount != null && invoice.netAmount != null && invoice.vatAmount != null) {
+        grossTotal += invoice.grossAmount!;
+        netTotal += invoice.netAmount!;
+        vatTotal += invoice.vatAmount!;
+      } else {
+        // Fallback to using the basic amount as gross
+        grossTotal += invoice.amount;
+        netTotal += invoice.amount; // Assume no VAT if data not available
+      }
+    }
+
+    return {
+      'grossTotal': grossTotal,
+      'netTotal': netTotal,
+      'vatTotal': vatTotal,
+      'count': count.toDouble(),
+    };
+  }
+
+  Map<String, double> _calculateExpenseVATMetrics() {
+    double grossTotal = 0.0;
+    double netTotal = 0.0;
+    double vatTotal = 0.0;
+    int count = 0;
+
+    for (final expense in _expenses) {
+      count++;
+      if (expense.grossAmount != null && expense.netAmount != null && expense.vatAmount != null) {
+        grossTotal += expense.grossAmount!;
+        netTotal += expense.netAmount!;
+        vatTotal += expense.vatAmount!;
+      } else {
+        // Fallback to using the basic amount as gross
+        grossTotal += expense.amount;
+        netTotal += expense.amount; // Assume no VAT if data not available
+      }
+    }
+
+    return {
+      'grossTotal': grossTotal,
+      'netTotal': netTotal,
+      'vatTotal': vatTotal,
+      'count': count.toDouble(),
+    };
+  }
+
   Widget _buildMetricsCards() {
-    // Use backend API metrics instead of local calculations
-    final totalIncome =
-        (_metrics['invoices']?['total_invoice_amount'] ?? 0).toDouble();
-    final totalExpenses =
-        (_metrics['expenses']?['total_expense_amount'] ?? 0).toDouble();
-    final netProfit = (_metrics['net_profit'] ?? 0).toDouble();
-    final pendingInvoices = (_metrics['invoices']?['pending_invoices'] ?? 0);
-    final totalInvoices = (_metrics['invoices']?['total_invoices'] ?? 0);
+    // Calculate VAT-aware metrics from local data
+    final invoiceMetrics = _calculateInvoiceVATMetrics();
+    final expenseMetrics = _calculateExpenseVATMetrics();
+    final netProfit = invoiceMetrics['grossTotal']! - expenseMetrics['grossTotal']!;
+    final totalVATCollected = invoiceMetrics['vatTotal']! - expenseMetrics['vatTotal']!;
 
     final metrics = [
       {
-        'title': 'Total Income',
-        'value': '${_getCurrencySymbol()}${totalIncome.toStringAsFixed(2)}',
-        'change': '+$totalInvoices invoices',
+        'title': 'Invoice Income',
+        'value': '${_getCurrencySymbol()}${invoiceMetrics['grossTotal']!.toStringAsFixed(2)}',
+        'subtitle': 'Net: ${_getCurrencySymbol()}${invoiceMetrics['netTotal']!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${invoiceMetrics['vatTotal']!.toStringAsFixed(2)}',
+        'change': '+${invoiceMetrics['count']!.toInt()} invoices',
         'icon': Icons.trending_up,
         'color': Colors.green,
       },
       {
         'title': 'Total Expenses',
-        'value': '${_getCurrencySymbol()}${totalExpenses.toStringAsFixed(2)}',
-        'change': '+${_expenses.length} expenses',
+        'value': '${_getCurrencySymbol()}${expenseMetrics['grossTotal']!.toStringAsFixed(2)}',
+        'subtitle': 'Net: ${_getCurrencySymbol()}${expenseMetrics['netTotal']!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${expenseMetrics['vatTotal']!.toStringAsFixed(2)}',
+        'change': '+${expenseMetrics['count']!.toInt()} expenses',
         'icon': Icons.trending_down,
         'color': Colors.red,
       },
       {
         'title': 'Net Profit',
         'value': '${_getCurrencySymbol()}${netProfit.toStringAsFixed(2)}',
+        'subtitle': 'Revenue minus expenses',
         'change': netProfit >= 0 ? 'Profit' : 'Loss',
         'icon': Icons.account_balance_wallet,
         'color': netProfit >= 0 ? Colors.blue : Colors.red,
       },
       {
-        'title': 'Pending Invoices',
-        'value': '$pendingInvoices',
-        'change': 'of $totalInvoices total',
-        'icon': Icons.receipt,
-        'color': Colors.orange,
+        'title': 'VAT Position',
+        'value': '${_getCurrencySymbol()}${totalVATCollected.toStringAsFixed(2)}',
+        'subtitle': totalVATCollected >= 0 ? 'VAT to pay' : 'VAT reclaimable',
+        'change': totalVATCollected >= 0 ? 'Owed to revenue' : 'Due from revenue',
+        'icon': Icons.receipt_long,
+        'color': totalVATCollected >= 0 ? Colors.orange : Colors.blue,
       },
     ];
 
@@ -1102,6 +1157,17 @@ class _HomePageState extends State<HomePage> {
                   color: Color(0xFF1E293B),
                 ),
               ),
+              if (metric.containsKey('subtitle'))
+                Text(
+                  metric['subtitle'] as String,
+                  style: TextStyle(
+                    fontSize: 8,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               Text(
                 metric['change'] as String,
                 style: TextStyle(
@@ -1440,13 +1506,7 @@ class _HomePageState extends State<HomePage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              _buildInvoiceVATBreakdown(invoice),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1554,14 +1614,7 @@ class _HomePageState extends State<HomePage> {
           ),
           Row(
             children: [
-              Text(
-                '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.red,
-                ),
-              ),
+              _buildExpenseVATBreakdown(expense),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => _showPDFOptions('expense', expense.id),
@@ -2003,6 +2056,96 @@ class _HomePageState extends State<HomePage> {
         return Colors.grey;
       default:
         return Colors.blue;
+    }
+  }
+
+  Widget _buildInvoiceVATBreakdown(Invoice invoice) {
+    // Check if we have VAT data
+    final bool hasVATData = invoice.grossAmount != null && invoice.netAmount != null && invoice.vatAmount != null;
+    
+    if (hasVATData) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Gross Amount (Total)
+          Text(
+            '${_getCurrencySymbol()}${invoice.grossAmount!.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // Net/VAT breakdown in smaller text
+          Text(
+            'Net: ${_getCurrencySymbol()}${invoice.netAmount!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${invoice.vatAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 8,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Fallback to original simple amount display
+      return Text(
+        '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+  }
+
+  Widget _buildExpenseVATBreakdown(Expense expense) {
+    // Check if we have VAT data
+    final bool hasVATData = expense.grossAmount != null && expense.netAmount != null && expense.vatAmount != null;
+    
+    if (hasVATData) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Gross Amount (Total)
+          Text(
+            '${_getCurrencySymbol()}${expense.grossAmount!.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.red,
+            ),
+          ),
+          // Net/VAT breakdown in smaller text
+          Text(
+            'Net: ${_getCurrencySymbol()}${expense.netAmount!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${expense.vatAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 8,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          // VAT Rate if available
+          if (expense.vatRate != null)
+            Text(
+              '(${expense.vatRate!.toStringAsFixed(1)}%)',
+              style: TextStyle(
+                fontSize: 7,
+                color: Colors.grey[500],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+        ],
+      );
+    } else {
+      // Fallback to original simple amount display
+      return Text(
+        '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.red,
+        ),
+      );
     }
   }
 }

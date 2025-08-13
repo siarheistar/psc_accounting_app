@@ -906,28 +906,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Amount',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                ],
-              ),
+              _buildVATBreakdown(invoice),
             ],
           ),
           const SizedBox(height: 12),
@@ -1060,5 +1039,81 @@ class _InvoicesPageState extends State<InvoicesPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildVATBreakdown(Invoice invoice) {
+    // Check if we have VAT data
+    final bool hasVATData = invoice.grossAmount != null && invoice.netAmount != null && invoice.vatAmount != null;
+    
+    if (hasVATData) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Amount Breakdown',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Gross Amount (Total)
+          Text(
+            '${_getCurrencySymbol()}${invoice.grossAmount!.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Net Amount
+          Text(
+            'Net: ${_getCurrencySymbol()}${invoice.netAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          // VAT Amount
+          Text(
+            'VAT: ${_getCurrencySymbol()}${invoice.vatAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          // Note: VAT rate percentage not available in Invoice model
+          // Only vatRateId is stored, would need separate lookup
+        ],
+      );
+    } else {
+      // Fallback to original simple amount display
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Amount',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ],
+      );
+    }
   }
 }
