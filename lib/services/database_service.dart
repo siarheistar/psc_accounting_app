@@ -853,10 +853,42 @@ class DatabaseService {
       debugPrint('💰 Response Body: ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        final error = jsonDecode(response.body);
+        String errorMessage = 'Failed to insert payroll entry';
+
+        try {
+          final error = jsonDecode(response.body);
+          errorMessage = error['detail'] ?? error['message'] ?? errorMessage;
+        } catch (e) {
+          // If response body is not valid JSON, use the raw response
+          errorMessage =
+              response.body.isNotEmpty ? response.body : errorMessage;
+        }
+
         debugPrint('💰 === INSERT FAILED ===');
-        debugPrint('💰 Error: ${error['message'] ?? 'Unknown error'}');
-        throw Exception(error['message'] ?? 'Failed to insert payroll entry');
+        debugPrint('💰 Status Code: ${response.statusCode}');
+        debugPrint('💰 Error Message: $errorMessage');
+
+        // Throw specific error messages based on status code
+        switch (response.statusCode) {
+          case 400:
+            throw Exception(errorMessage); // Bad request - validation error
+          case 401:
+            throw Exception(
+                'Authentication failed. Please check your credentials.');
+          case 403:
+            throw Exception(
+                'Access denied. You do not have permission to perform this action.');
+          case 404:
+            throw Exception(
+                'Service not found. Please check your configuration.');
+          case 500:
+            throw Exception('Server error: $errorMessage');
+          case 503:
+            throw Exception(
+                'Service temporarily unavailable. Please try again later.');
+          default:
+            throw Exception('HTTP Error ${response.statusCode}: $errorMessage');
+        }
       }
 
       debugPrint('💰 === PAYROLL INSERT SUCCESS ===');

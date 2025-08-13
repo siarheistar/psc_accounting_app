@@ -1398,6 +1398,54 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
     print(f"📄 [Backend] Invoice data: {invoice_data}")
     
     try:
+        # Validate numeric fields before database insertion
+        MAX_AMOUNT = 99999999.99  # Maximum for NUMERIC(10,2)
+        
+        amount = float(invoice_data.get('amount', 0))
+        net_amount = float(invoice_data.get('net_amount', 0)) if invoice_data.get('net_amount') else 0
+        vat_amount = float(invoice_data.get('vat_amount', 0)) if invoice_data.get('vat_amount') else 0
+        gross_amount = float(invoice_data.get('gross_amount', 0)) if invoice_data.get('gross_amount') else 0
+        
+        # Validate amounts
+        if amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invoice amount ({amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if net_amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Net amount ({net_amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if vat_amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"VAT amount ({vat_amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if gross_amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gross amount ({gross_amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+            
+        # Validate negative amounts
+        if amount < 0:
+            raise HTTPException(status_code=400, detail="Invoice amount cannot be negative")
+        if net_amount < 0:
+            raise HTTPException(status_code=400, detail="Net amount cannot be negative")
+        if vat_amount < 0:
+            raise HTTPException(status_code=400, detail="VAT amount cannot be negative")
+        if gross_amount < 0:
+            raise HTTPException(status_code=400, detail="Gross amount cannot be negative")
+            
+        # Validate required fields
+        if not invoice_data.get('client_name'):
+            raise HTTPException(status_code=400, detail="Client name is required")
+        if not invoice_data.get('invoice_number'):
+            raise HTTPException(status_code=400, detail="Invoice number is required")
+        if not invoice_data.get('description'):
+            raise HTTPException(status_code=400, detail="Invoice description is required")
+        
         # Insert new invoice with VAT fields
         insert_query = """
         INSERT INTO public.invoices 
@@ -1410,7 +1458,7 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
         result = execute_query(insert_query, (
             int(company_id),
             invoice_data.get('client_name'),
-            float(invoice_data.get('amount', 0)),
+            amount,
             invoice_data.get('date'),
             invoice_data.get('due_date'),
             invoice_data.get('status', 'pending'),
@@ -1419,19 +1467,36 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
             # VAT fields
             invoice_data.get('vat_rate_id'),
             float(invoice_data.get('net_amount', 0)) if invoice_data.get('net_amount') else None,
-            float(invoice_data.get('vat_amount', 0)) if invoice_data.get('vat_amount') else None,
-            float(invoice_data.get('gross_amount', 0)) if invoice_data.get('gross_amount') else None
+            net_amount if net_amount > 0 else None,
+            vat_amount if vat_amount > 0 else None,
+            gross_amount if gross_amount > 0 else None
         ), fetch=True)
         
         # Handle the result properly - it's a tuple when using RETURNING
         invoice_id = result[0] if result and len(result) > 0 else None
         print(f"✅ [Backend] Invoice created with ID: {invoice_id} with VAT data")
-        print(f"📊 [Backend] VAT breakdown - Net: {invoice_data.get('net_amount')}, VAT: {invoice_data.get('vat_amount')}, Gross: {invoice_data.get('gross_amount')}")
+        print(f"📊 [Backend] VAT breakdown - Net: {net_amount}, VAT: {vat_amount}, Gross: {gross_amount}")
         return {"id": invoice_id, "message": "Invoice created successfully"}
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except Exception as e:
         print(f"❌ [Backend] Create invoice error: {e}")
-        raise HTTPException(status_code=500, detail=f"Create failed: {str(e)}")
+        # Provide more specific error messages
+        error_msg = str(e)
+        if "numeric field overflow" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Amount value exceeds the maximum allowed limit. Please enter a smaller amount."
+            )
+        elif "invalid input syntax" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid data format. Please check your input values."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.post("/expenses")
 async def create_expense(expense_data: dict, company_id: str = Query(..., description="Company ID")):
@@ -1441,6 +1506,52 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
     print(f"💰 [Backend] Expense data: {expense_data}")
     
     try:
+        # Validate numeric fields before database insertion
+        MAX_AMOUNT = 99999999.99  # Maximum for NUMERIC(10,2)
+        
+        amount = float(expense_data.get('amount', 0))
+        vat_amount = float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else 0
+        net_amount = float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else 0
+        gross_amount = float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else 0
+        
+        # Validate amounts
+        if amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Expense amount ({amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if vat_amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"VAT amount ({vat_amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if net_amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Net amount ({net_amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if gross_amount > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gross amount ({gross_amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+            
+        # Validate negative amounts
+        if amount < 0:
+            raise HTTPException(status_code=400, detail="Expense amount cannot be negative")
+        if vat_amount < 0:
+            raise HTTPException(status_code=400, detail="VAT amount cannot be negative")
+        if net_amount < 0:
+            raise HTTPException(status_code=400, detail="Net amount cannot be negative")
+        if gross_amount < 0:
+            raise HTTPException(status_code=400, detail="Gross amount cannot be negative")
+            
+        # Validate required fields
+        if not expense_data.get('description'):
+            raise HTTPException(status_code=400, detail="Expense description is required")
+        if not expense_data.get('category'):
+            raise HTTPException(status_code=400, detail="Expense category is required")
+        
         # Insert new expense with VAT fields
         insert_query = """
         INSERT INTO public.expenses 
@@ -1450,27 +1561,24 @@ async def create_expense(expense_data: dict, company_id: str = Query(..., descri
         RETURNING id
         """
         
-        # Prepare parameters with detailed logging
+        # Prepare parameters with detailed logging and validated amounts
         vat_rate_value = float(expense_data.get('vat_rate', 0)) if expense_data.get('vat_rate') else None
         vat_rate_id_value = int(expense_data.get('vat_rate_id')) if expense_data.get('vat_rate_id') else None
-        vat_amount_value = float(expense_data.get('vat_amount', 0)) if expense_data.get('vat_amount') else None
-        net_amount_value = float(expense_data.get('net_amount', 0)) if expense_data.get('net_amount') else None
-        gross_amount_value = float(expense_data.get('gross_amount', 0)) if expense_data.get('gross_amount') else None
         
         parameters = (
             int(company_id),
             expense_data.get('description'),
             expense_data.get('category'),
-            float(expense_data.get('amount', 0)),
+            amount,  # Use validated amount
             expense_data.get('date'),
             expense_data.get('status', 'pending'),
             expense_data.get('notes'),
             # VAT fields
             vat_rate_value,
             vat_rate_id_value,
-            vat_amount_value,
-            net_amount_value,
-            gross_amount_value
+            vat_amount if vat_amount > 0 else None,
+            net_amount if net_amount > 0 else None,
+            gross_amount if gross_amount > 0 else None
         )
         
         print(f"🔍 [Backend] === EXPENSE CREATE DEBUG ===")
@@ -1510,6 +1618,44 @@ async def create_payroll(payroll_data: dict, company_id: str = Query(..., descri
     print(f"👥 [Backend] Payroll data: {payroll_data}")
     
     try:
+        # Validate numeric fields before database insertion
+        MAX_AMOUNT = 99999999.99  # Maximum for NUMERIC(10,2)
+        
+        gross_pay = float(payroll_data.get('gross_pay', 0))
+        deductions = float(payroll_data.get('deductions', 0))
+        net_pay = float(payroll_data.get('net_pay', 0))
+        
+        # Validate amounts
+        if gross_pay > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gross pay amount ({gross_pay:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if deductions > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Deductions amount ({deductions:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+        if net_pay > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Net pay amount ({net_pay:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+            
+        # Validate negative amounts
+        if gross_pay < 0:
+            raise HTTPException(status_code=400, detail="Gross pay cannot be negative")
+        if deductions < 0:
+            raise HTTPException(status_code=400, detail="Deductions cannot be negative")
+        if net_pay < 0:
+            raise HTTPException(status_code=400, detail="Net pay cannot be negative")
+            
+        # Validate required fields
+        if not payroll_data.get('employee_name'):
+            raise HTTPException(status_code=400, detail="Employee name is required")
+        if not payroll_data.get('period'):
+            raise HTTPException(status_code=400, detail="Pay period is required")
+        
         # Insert new payroll entry
         insert_query = """
         INSERT INTO public.payroll 
@@ -1522,9 +1668,9 @@ async def create_payroll(payroll_data: dict, company_id: str = Query(..., descri
             int(company_id),
             payroll_data.get('employee_name'),
             payroll_data.get('period'),
-            float(payroll_data.get('gross_pay', 0)),
-            float(payroll_data.get('deductions', 0)),
-            float(payroll_data.get('net_pay', 0)),
+            gross_pay,
+            deductions,
+            net_pay,
             payroll_data.get('pay_date')
         ), fetch=True)
         
@@ -1533,9 +1679,25 @@ async def create_payroll(payroll_data: dict, company_id: str = Query(..., descri
         print(f"✅ [Backend] Payroll entry created with ID: {payroll_id}")
         return {"id": payroll_id, "message": "Payroll entry created successfully"}
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except Exception as e:
         print(f"❌ [Backend] Create payroll error: {e}")
-        raise HTTPException(status_code=500, detail=f"Create failed: {str(e)}")
+        # Provide more specific error messages
+        error_msg = str(e)
+        if "numeric field overflow" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Amount value exceeds the maximum allowed limit. Please enter a smaller amount."
+            )
+        elif "invalid input syntax" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid data format. Please check your input values."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.post("/bank-statements")
 async def create_bank_statement(statement_data: dict, company_id: str = Query(..., description="Company ID")):
@@ -1545,6 +1707,24 @@ async def create_bank_statement(statement_data: dict, company_id: str = Query(..
     print(f"🏦 [Backend] Statement data: {statement_data}")
     
     try:
+        # Validate numeric fields before database insertion
+        MAX_AMOUNT = 99999999.99  # Maximum for NUMERIC(10,2)
+        
+        amount = float(statement_data.get('amount', 0))
+        
+        # Validate amount
+        if abs(amount) > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Transaction amount ({amount:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
+            
+        # Validate required fields
+        if not statement_data.get('description'):
+            raise HTTPException(status_code=400, detail="Transaction description is required")
+        if not statement_data.get('transaction_date'):
+            raise HTTPException(status_code=400, detail="Transaction date is required")
+        
         # Insert new bank statement with proper field mapping
         insert_query = """
         INSERT INTO public.bank_statements 
@@ -1556,13 +1736,19 @@ async def create_bank_statement(statement_data: dict, company_id: str = Query(..
         # Calculate balance (this is a simple approach - in production you'd track running balance)
         # For now, we'll set balance to amount for deposits, negative for withdrawals
         transaction_type = statement_data.get('transaction_type', 'deposit')
-        amount = float(statement_data.get('amount', 0))
         
         # Simple balance calculation - in real app you'd calculate from previous transactions
         if transaction_type.lower() == 'withdrawal':
             balance = -amount  # Negative balance for withdrawals
         else:
             balance = amount   # Positive balance for deposits
+            
+        # Validate balance doesn't exceed limits
+        if abs(balance) > MAX_AMOUNT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Calculated balance ({balance:,.2f}) exceeds maximum allowed value ({MAX_AMOUNT:,.2f})"
+            )
         
         result = execute_query(insert_query, (
             int(company_id),
@@ -1578,9 +1764,25 @@ async def create_bank_statement(statement_data: dict, company_id: str = Query(..
         print(f"✅ [Backend] Bank statement created with ID: {statement_id}")
         return {"id": statement_id, "message": "Bank statement created successfully"}
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except Exception as e:
         print(f"❌ [Backend] Create bank statement error: {e}")
-        raise HTTPException(status_code=500, detail=f"Create failed: {str(e)}")
+        # Provide more specific error messages
+        error_msg = str(e)
+        if "numeric field overflow" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Amount value exceeds the maximum allowed limit. Please enter a smaller amount."
+            )
+        elif "invalid input syntax" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid data format. Please check your input values."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 # ================== DELETE ENDPOINTS ==================
 

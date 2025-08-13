@@ -270,15 +270,45 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
       debugPrint('👥 === DIALOG INSERT ERROR ===');
       debugPrint('👥 Exception: $e');
       if (mounted) {
-        // Show detailed error dialog instead of snackbar
+        String errorTitle = 'Payroll Creation Failed';
+        String errorMessage = e.toString();
+
+        // Parse common error types for user-friendly messages
+        if (errorMessage.contains('exceeds maximum allowed value') ||
+            errorMessage
+                .contains('Amount value exceeds the maximum allowed limit')) {
+          errorTitle = 'Amount Too Large';
+          errorMessage =
+              'The entered amount is too large. Please enter an amount less than €99,999,999.99';
+        } else if (errorMessage.contains('numeric field overflow')) {
+          errorTitle = 'Invalid Amount';
+          errorMessage =
+              'The amount entered is too large for the system. Please enter a smaller amount.';
+        } else if (errorMessage.contains('Connection refused') ||
+            errorMessage.contains('No host specified') ||
+            errorMessage.contains('Network is unreachable')) {
+          errorTitle = 'Connection Error';
+          errorMessage =
+              'Unable to connect to the server. Please check your internet connection and try again.';
+        } else if (errorMessage.contains('Server error') ||
+            errorMessage.contains('500')) {
+          errorTitle = 'Server Error';
+          errorMessage =
+              'A server error occurred. Please try again in a few moments.';
+        } else if (errorMessage.contains('required')) {
+          errorTitle = 'Missing Information';
+          errorMessage = 'Please fill in all required fields and try again.';
+        }
+
+        // Show detailed error dialog
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.error, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Payroll Creation Failed'),
+                const Icon(Icons.error, color: Colors.red),
+                const SizedBox(width: 8),
+                Flexible(child: Text(errorTitle)),
               ],
             ),
             content: SingleChildScrollView(
@@ -286,9 +316,14 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Text(
+                    errorMessage,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
                   const Text(
-                    'Error Details:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    'Technical Details:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -432,21 +467,30 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
                               border: const OutlineInputBorder(),
                               prefixIcon: const Icon(Icons.attach_money),
                               prefixText: _getCurrencySymbol(),
+                              helperText:
+                                  'Maximum: ${_getCurrencySymbol()}99,999,999.99',
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(
                                   RegExp(r'^\d+\.?\d{0,2}')),
+                              // Limit input length to prevent overflow
+                              LengthLimitingTextInputFormatter(
+                                  12), // 99999999.99 = 11 chars max
                             ],
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter gross pay';
                               }
-                              if (double.tryParse(value) == null) {
+                              final amount = double.tryParse(value);
+                              if (amount == null) {
                                 return 'Please enter a valid amount';
                               }
-                              if (double.parse(value) <= 0) {
+                              if (amount <= 0) {
                                 return 'Gross pay must be greater than 0';
+                              }
+                              if (amount > 99999999.99) {
+                                return 'Amount exceeds maximum limit of ${_getCurrencySymbol()}99,999,999.99';
                               }
                               return null;
                             },
@@ -462,22 +506,28 @@ class _AddPayrollDialogState extends State<AddPayrollDialog> {
                               prefixIcon:
                                   const Icon(Icons.remove_circle_outline),
                               prefixText: _getCurrencySymbol(),
-                              helperText: 'Tax, insurance, pension, etc.',
+                              helperText:
+                                  'Tax, insurance, pension, etc. Max: ${_getCurrencySymbol()}99,999,999.99',
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(
                                   RegExp(r'^\d+\.?\d{0,2}')),
+                              LengthLimitingTextInputFormatter(12),
                             ],
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter deductions (enter 0 if none)';
                               }
-                              if (double.tryParse(value) == null) {
+                              final amount = double.tryParse(value);
+                              if (amount == null) {
                                 return 'Please enter a valid amount';
                               }
-                              if (double.parse(value) < 0) {
+                              if (amount < 0) {
                                 return 'Deductions cannot be negative';
+                              }
+                              if (amount > 99999999.99) {
+                                return 'Amount exceeds maximum limit of ${_getCurrencySymbol()}99,999,999.99';
                               }
                               return null;
                             },
