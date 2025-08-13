@@ -1101,20 +1101,44 @@ class _HomePageState extends State<HomePage> {
       },
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        childAspectRatio: 2.6, // Reduced height - twice less than before
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: metrics.length,
-      itemBuilder: (context, index) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Responsive column count based on screen width
+        int crossAxisCount;
+        double childAspectRatio;
+        
+        if (constraints.maxWidth < 600) {
+          // Mobile: 1-2 columns  
+          crossAxisCount = constraints.maxWidth < 400 ? 1 : 2;
+          childAspectRatio = constraints.maxWidth < 400 ? 3.5 : 3.2;
+        } else if (constraints.maxWidth < 900) {
+          // Small tablets: 2-3 columns
+          crossAxisCount = 2;
+          childAspectRatio = 3.0;
+        } else if (constraints.maxWidth < 1200) {
+          // Large tablets: 3 columns
+          crossAxisCount = 3;
+          childAspectRatio = 2.8;
+        } else {
+          // Desktop: 4 columns
+          crossAxisCount = 4;
+          childAspectRatio = 2.6;
+        }
+        
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: metrics.length,
+          itemBuilder: (context, index) {
         final metric = metrics[index];
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -1128,57 +1152,70 @@ class _HomePageState extends State<HomePage> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       metric['title'] as String,
-                      style: const TextStyle(
-                        fontSize: 11,
+                      style: TextStyle(
+                        fontSize: crossAxisCount >= 4 ? 10 : 11,
                         color: Colors.grey,
                         fontWeight: FontWeight.w500,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Icon(
                     metric['icon'] as IconData,
-                    size: 18,
+                    size: crossAxisCount >= 4 ? 16 : 18,
                     color: metric['color'] as Color,
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                metric['value'] as String,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              if (metric.containsKey('subtitle'))
-                Text(
-                  metric['subtitle'] as String,
+              SizedBox(height: crossAxisCount >= 4 ? 4 : 6),
+              Flexible(
+                child: Text(
+                  metric['value'] as String,
                   style: TextStyle(
-                    fontSize: 8,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w400,
+                    fontSize: crossAxisCount >= 4 ? 14 : 16,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1E293B),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              if (metric.containsKey('subtitle'))
+                Flexible(
+                  child: Text(
+                    metric['subtitle'] as String,
+                    style: TextStyle(
+                      fontSize: crossAxisCount >= 4 ? 7 : 8,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w400,
+                    ),
+                    maxLines: crossAxisCount >= 4 ? 1 : 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               Text(
                 metric['change'] as String,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: crossAxisCount >= 4 ? 9 : 10,
                   color: metric['color'] as Color,
                   fontWeight: FontWeight.w500,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         );
+      },
+    );
       },
     );
   }
@@ -1460,44 +1497,56 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildInvoiceCard(Invoice invoice) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: _getStatusColor(invoice.status).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.receipt,
-              size: 16,
+              size: 18,
               color: _getStatusColor(invoice.status),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
                   invoice.invoiceNumber,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   invoice.clientName,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.grey[600],
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
@@ -1505,55 +1554,58 @@ class _HomePageState extends State<HomePage> {
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildInvoiceVATBreakdown(invoice),
+              const SizedBox(height: 12),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getStatusColor(invoice.status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      invoice.status,
+                      invoice.status.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
                         color: _getStatusColor(invoice.status),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _showPDFOptions('invoice', invoice.id),
                     child: Container(
-                      padding: const EdgeInsets.all(2),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Icon(
                         Icons.attach_file,
-                        size: 12,
+                        size: 14,
                         color: Colors.blue,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   GestureDetector(
                     onTap: () => _showEditDeleteOptions('invoice', invoice),
                     child: Container(
-                      padding: const EdgeInsets.all(2),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Icon(
                         Icons.more_vert,
-                        size: 12,
+                        size: 14,
                         color: Colors.grey,
                       ),
                     ),
@@ -1569,83 +1621,104 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildExpenseCard(Expense expense) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
-              Icons.money_off,
-              size: 16,
+              Icons.receipt_outlined,
+              size: 18,
               color: Colors.red,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
                   expense.description,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
                 Text(
                   expense.category,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.grey[600],
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
             ),
           ),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildExpenseVATBreakdown(expense),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _showPDFOptions('expense', expense.id),
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () => _showPDFOptions('expense', expense.id),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.attach_file,
+                        size: 14,
+                        color: Colors.blue,
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.attach_file,
-                    size: 12,
-                    color: Colors.blue,
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _showEditDeleteOptions('expense', expense),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.more_vert,
+                        size: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => _showEditDeleteOptions('expense', expense),
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.more_vert,
-                    size: 12,
-                    color: Colors.grey,
-                  ),
-                ),
+                ],
               ),
             ],
           ),
@@ -1656,89 +1729,133 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildPayrollCard(PayrollEntry entry) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
-              Icons.person,
-              size: 16,
+              Icons.person_outline,
+              size: 18,
               color: Colors.blue,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
                   entry.employeeName,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
                 Text(
                   entry.period,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.grey[600],
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
             ),
           ),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${_getCurrencySymbol()}${entry.netPay.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Net Pay',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_getCurrencySymbol()}${entry.netPay.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  if (entry.grossPay > entry.netPay)
+                    Text(
+                      'Gross: ${_getCurrencySymbol()}${entry.grossPay.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _showPDFOptions('payroll', entry.id),
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () => _showPDFOptions('payroll', entry.id),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.attach_file,
+                        size: 14,
+                        color: Colors.blue,
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.attach_file,
-                    size: 12,
-                    color: Colors.blue,
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _showEditDeleteOptions('payroll', entry),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.more_vert,
+                        size: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => _showEditDeleteOptions('payroll', entry),
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.more_vert,
-                    size: 12,
-                    color: Colors.grey,
-                  ),
-                ),
+                ],
               ),
             ],
           ),
@@ -1751,44 +1868,59 @@ class _HomePageState extends State<HomePage> {
     final isCredit = statement.amount > 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: (isCredit ? Colors.green : Colors.red).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              isCredit ? Icons.add : Icons.remove,
-              size: 16,
+              isCredit ? Icons.trending_up : Icons.trending_down,
+              size: 18,
               color: isCredit ? Colors.green : Colors.red,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
                   statement.description,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  statement.transactionType,
+                  statement.transactionType.toUpperCase(),
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
@@ -1796,55 +1928,73 @@ class _HomePageState extends State<HomePage> {
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${isCredit ? '+' : ''}${_getCurrencySymbol()}${statement.amount.abs().toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isCredit ? Colors.green : Colors.red,
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'Bal: ${_getCurrencySymbol()}${statement.balance.toStringAsFixed(2)}',
+                    isCredit ? 'CREDIT' : 'DEBIT',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${isCredit ? '+' : '-'}${_getCurrencySymbol()}${statement.amount.abs().toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isCredit ? Colors.green : Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Balance: ${_getCurrencySymbol()}${statement.balance.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.grey[600],
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   GestureDetector(
                     onTap: () =>
                         _showPDFOptions('bank_statement', statement.id),
                     child: Container(
-                      padding: const EdgeInsets.all(2),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Icon(
                         Icons.attach_file,
-                        size: 12,
+                        size: 14,
                         color: Colors.blue,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () =>
                         _showEditDeleteOptions('bank_statement', statement),
                     child: Container(
-                      padding: const EdgeInsets.all(2),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Icon(
                         Icons.more_vert,
-                        size: 12,
+                        size: 14,
                         color: Colors.grey,
                       ),
                     ),
@@ -2067,19 +2217,39 @@ class _HomePageState extends State<HomePage> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          Text(
+            'TOTAL',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
           // Gross Amount (Total)
           Text(
             '${_getCurrencySymbol()}${invoice.grossAmount!.toStringAsFixed(2)}',
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.green,
             ),
           ),
+          const SizedBox(height: 4),
           // Net/VAT breakdown in smaller text
           Text(
-            'Net: ${_getCurrencySymbol()}${invoice.netAmount!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${invoice.vatAmount!.toStringAsFixed(2)}',
+            'Net: ${_getCurrencySymbol()}${invoice.netAmount!.toStringAsFixed(2)}',
             style: TextStyle(
-              fontSize: 8,
+              fontSize: 10,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          Text(
+            'VAT: ${_getCurrencySymbol()}${invoice.vatAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 10,
               color: Colors.grey[600],
               fontWeight: FontWeight.w400,
             ),
@@ -2088,12 +2258,28 @@ class _HomePageState extends State<HomePage> {
       );
     } else {
       // Fallback to original simple amount display
-      return Text(
-        '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'AMOUNT',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${_getCurrencySymbol()}${invoice.amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.green,
+            ),
+          ),
+        ],
       );
     }
   }
@@ -2106,20 +2292,39 @@ class _HomePageState extends State<HomePage> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          Text(
+            'TOTAL',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
           // Gross Amount (Total)
           Text(
             '${_getCurrencySymbol()}${expense.grossAmount!.toStringAsFixed(2)}',
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
               color: Colors.red,
             ),
           ),
+          const SizedBox(height: 4),
           // Net/VAT breakdown in smaller text
           Text(
-            'Net: ${_getCurrencySymbol()}${expense.netAmount!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${expense.vatAmount!.toStringAsFixed(2)}',
+            'Net: ${_getCurrencySymbol()}${expense.netAmount!.toStringAsFixed(2)}',
             style: TextStyle(
-              fontSize: 8,
+              fontSize: 10,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          Text(
+            'VAT: ${_getCurrencySymbol()}${expense.vatAmount!.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 10,
               color: Colors.grey[600],
               fontWeight: FontWeight.w400,
             ),
@@ -2129,22 +2334,38 @@ class _HomePageState extends State<HomePage> {
             Text(
               '(${expense.vatRate!.toStringAsFixed(1)}%)',
               style: TextStyle(
-                fontSize: 7,
+                fontSize: 9,
                 color: Colors.grey[500],
                 fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
               ),
             ),
         ],
       );
     } else {
       // Fallback to original simple amount display
-      return Text(
-        '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Colors.red,
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'AMOUNT',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${_getCurrencySymbol()}${expense.amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.red,
+            ),
+          ),
+        ],
       );
     }
   }
