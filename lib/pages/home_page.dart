@@ -901,38 +901,54 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDashboard() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome section
-          _buildWelcomeSection(),
-          const SizedBox(height: 24),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Responsive padding based on screen size
+        final padding = constraints.maxWidth < 600
+            ? const EdgeInsets.all(16)
+            : constraints.maxWidth < 1200
+                ? const EdgeInsets.all(24)
+                : const EdgeInsets.symmetric(horizontal: 40, vertical: 24);
 
-          // Quick Overview title
-          const Text(
-            'Quick Overview',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
+        final spacing = constraints.maxWidth < 600 ? 16.0 : 24.0;
+
+        return SingleChildScrollView(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Welcome section
+              _buildWelcomeSection(),
+              SizedBox(height: spacing),
+
+              // Quick Overview title
+              Text(
+                'Quick Overview',
+                style: TextStyle(
+                  fontSize: constraints.maxWidth < 600 ? 16 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+              SizedBox(height: constraints.maxWidth < 600 ? 8 : 12),
+
+              // Metrics cards with responsive spacing
+              _buildMetricsCards(),
+              SizedBox(height: constraints.maxWidth < 600 ? 24 : 32),
+
+              // Responsive data tabs
+              _buildDataTabs(),
+              SizedBox(height: constraints.maxWidth < 600 ? 12 : 16),
+
+              // Tab content
+              _buildTabContent(),
+
+              // Bottom padding for mobile navigation
+              SizedBox(height: constraints.maxWidth < 600 ? 80 : 24),
+            ],
           ),
-          const SizedBox(height: 10),
-
-          // Metrics cards with adjusted height
-          _buildMetricsCards(),
-          const SizedBox(height: 32),
-
-          // Horizontal data tabs
-          _buildDataTabs(),
-          const SizedBox(height: 16),
-
-          // Tab content
-          _buildTabContent(),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -940,67 +956,91 @@ class _HomePageState extends State<HomePage> {
     final user = FirebaseAuth.instance.currentUser;
     final isDemoMode = _dbService.isDemoMode;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDemoMode
-              ? [Colors.orange, Colors.deepOrange]
-              : [Colors.blue, Colors.indigo],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = constraints.maxWidth < 600;
+
+        return Container(
+          padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDemoMode
+                  ? [Colors.orange, Colors.deepOrange]
+                  : [Colors.blue, Colors.indigo],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: isSmallScreen
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildWelcomeContent(isDemoMode, user, isSmallScreen),
+                    const SizedBox(height: 16),
+                    Center(child: _buildWelcomeIcon(isDemoMode, isSmallScreen)),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                        child: _buildWelcomeContent(
+                            isDemoMode, user, isSmallScreen)),
+                    _buildWelcomeIcon(isDemoMode, isSmallScreen),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWelcomeContent(bool isDemoMode, User? user, bool isSmallScreen) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isDemoMode ? 'Demo Dashboard' : 'Welcome back!',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSmallScreen ? 18 : 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        borderRadius: BorderRadius.circular(12),
+        const SizedBox(height: 4),
+        Text(
+          isDemoMode
+              ? 'Exploring sample data - ${user?.displayName ?? 'User'}'
+              : 'Hello, ${user?.displayName?.split(' ').first ?? 'User'}!',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: isSmallScreen ? 13 : 14,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isDemoMode
+              ? 'This is demonstration data only'
+              : 'Here\'s what\'s happening with your finances.',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: isSmallScreen ? 11 : 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWelcomeIcon(bool isDemoMode, bool isSmallScreen) {
+    return Container(
+      padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isDemoMode ? 'Demo Dashboard' : 'Welcome back!',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  isDemoMode
-                      ? 'Exploring sample data - ${user?.displayName ?? 'User'}'
-                      : 'Hello, ${user?.displayName?.split(' ').first ?? 'User'}!',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isDemoMode
-                      ? 'This is demonstration data only'
-                      : 'Here\'s what\'s happening with your finances.',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isDemoMode ? Icons.preview : Icons.dashboard,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-        ],
+      child: Icon(
+        isDemoMode ? Icons.preview : Icons.dashboard,
+        color: Colors.white,
+        size: 24,
       ),
     );
   }
@@ -1013,7 +1053,9 @@ class _HomePageState extends State<HomePage> {
 
     for (final invoice in _invoices) {
       count++;
-      if (invoice.grossAmount != null && invoice.netAmount != null && invoice.vatAmount != null) {
+      if (invoice.grossAmount != null &&
+          invoice.netAmount != null &&
+          invoice.vatAmount != null) {
         grossTotal += invoice.grossAmount!;
         netTotal += invoice.netAmount!;
         vatTotal += invoice.vatAmount!;
@@ -1040,7 +1082,9 @@ class _HomePageState extends State<HomePage> {
 
     for (final expense in _expenses) {
       count++;
-      if (expense.grossAmount != null && expense.netAmount != null && expense.vatAmount != null) {
+      if (expense.grossAmount != null &&
+          expense.netAmount != null &&
+          expense.vatAmount != null) {
         grossTotal += expense.grossAmount!;
         netTotal += expense.netAmount!;
         vatTotal += expense.vatAmount!;
@@ -1063,22 +1107,28 @@ class _HomePageState extends State<HomePage> {
     // Calculate VAT-aware metrics from local data
     final invoiceMetrics = _calculateInvoiceVATMetrics();
     final expenseMetrics = _calculateExpenseVATMetrics();
-    final netProfit = invoiceMetrics['grossTotal']! - expenseMetrics['grossTotal']!;
-    final totalVATCollected = invoiceMetrics['vatTotal']! - expenseMetrics['vatTotal']!;
+    final netProfit =
+        invoiceMetrics['grossTotal']! - expenseMetrics['grossTotal']!;
+    final totalVATCollected =
+        invoiceMetrics['vatTotal']! - expenseMetrics['vatTotal']!;
 
     final metrics = [
       {
         'title': 'Invoice Income',
-        'value': '${_getCurrencySymbol()}${invoiceMetrics['grossTotal']!.toStringAsFixed(2)}',
-        'subtitle': 'Net: ${_getCurrencySymbol()}${invoiceMetrics['netTotal']!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${invoiceMetrics['vatTotal']!.toStringAsFixed(2)}',
+        'value':
+            '${_getCurrencySymbol()}${invoiceMetrics['grossTotal']!.toStringAsFixed(2)}',
+        'subtitle':
+            'Net: ${_getCurrencySymbol()}${invoiceMetrics['netTotal']!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${invoiceMetrics['vatTotal']!.toStringAsFixed(2)}',
         'change': '+${invoiceMetrics['count']!.toInt()} invoices',
         'icon': Icons.trending_up,
         'color': Colors.green,
       },
       {
         'title': 'Total Expenses',
-        'value': '${_getCurrencySymbol()}${expenseMetrics['grossTotal']!.toStringAsFixed(2)}',
-        'subtitle': 'Net: ${_getCurrencySymbol()}${expenseMetrics['netTotal']!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${expenseMetrics['vatTotal']!.toStringAsFixed(2)}',
+        'value':
+            '${_getCurrencySymbol()}${expenseMetrics['grossTotal']!.toStringAsFixed(2)}',
+        'subtitle':
+            'Net: ${_getCurrencySymbol()}${expenseMetrics['netTotal']!.toStringAsFixed(2)} | VAT: ${_getCurrencySymbol()}${expenseMetrics['vatTotal']!.toStringAsFixed(2)}',
         'change': '+${expenseMetrics['count']!.toInt()} expenses',
         'icon': Icons.trending_down,
         'color': Colors.red,
@@ -1093,9 +1143,11 @@ class _HomePageState extends State<HomePage> {
       },
       {
         'title': 'VAT Position',
-        'value': '${_getCurrencySymbol()}${totalVATCollected.toStringAsFixed(2)}',
+        'value':
+            '${_getCurrencySymbol()}${totalVATCollected.toStringAsFixed(2)}',
         'subtitle': totalVATCollected >= 0 ? 'VAT to pay' : 'VAT reclaimable',
-        'change': totalVATCollected >= 0 ? 'Owed to revenue' : 'Due from revenue',
+        'change':
+            totalVATCollected >= 0 ? 'Owed to revenue' : 'Due from revenue',
         'icon': Icons.receipt_long,
         'color': totalVATCollected >= 0 ? Colors.orange : Colors.blue,
       },
@@ -1106,9 +1158,9 @@ class _HomePageState extends State<HomePage> {
         // Responsive column count based on screen width
         int crossAxisCount;
         double childAspectRatio;
-        
+
         if (constraints.maxWidth < 600) {
-          // Mobile: 1-2 columns  
+          // Mobile: 1-2 columns
           crossAxisCount = constraints.maxWidth < 400 ? 1 : 2;
           childAspectRatio = constraints.maxWidth < 400 ? 3.5 : 3.2;
         } else if (constraints.maxWidth < 900) {
@@ -1124,7 +1176,7 @@ class _HomePageState extends State<HomePage> {
           crossAxisCount = 4;
           childAspectRatio = 2.6;
         }
-        
+
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1136,86 +1188,86 @@ class _HomePageState extends State<HomePage> {
           ),
           itemCount: metrics.length,
           itemBuilder: (context, index) {
-        final metric = metrics[index];
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+            final metric = metrics[index];
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          metric['title'] as String,
+                          style: TextStyle(
+                            fontSize: crossAxisCount >= 4 ? 10 : 11,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        metric['icon'] as IconData,
+                        size: crossAxisCount >= 4 ? 16 : 18,
+                        color: metric['color'] as Color,
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: crossAxisCount >= 4 ? 4 : 6),
+                  Flexible(
                     child: Text(
-                      metric['title'] as String,
+                      metric['value'] as String,
                       style: TextStyle(
-                        fontSize: crossAxisCount >= 4 ? 10 : 11,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
+                        fontSize: crossAxisCount >= 4 ? 14 : 16,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E293B),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Icon(
-                    metric['icon'] as IconData,
-                    size: crossAxisCount >= 4 ? 16 : 18,
-                    color: metric['color'] as Color,
+                  if (metric.containsKey('subtitle'))
+                    Flexible(
+                      child: Text(
+                        metric['subtitle'] as String,
+                        style: TextStyle(
+                          fontSize: crossAxisCount >= 4 ? 7 : 8,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w400,
+                        ),
+                        maxLines: crossAxisCount >= 4 ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  Text(
+                    metric['change'] as String,
+                    style: TextStyle(
+                      fontSize: crossAxisCount >= 4 ? 9 : 10,
+                      color: metric['color'] as Color,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-              SizedBox(height: crossAxisCount >= 4 ? 4 : 6),
-              Flexible(
-                child: Text(
-                  metric['value'] as String,
-                  style: TextStyle(
-                    fontSize: crossAxisCount >= 4 ? 14 : 16,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E293B),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (metric.containsKey('subtitle'))
-                Flexible(
-                  child: Text(
-                    metric['subtitle'] as String,
-                    style: TextStyle(
-                      fontSize: crossAxisCount >= 4 ? 7 : 8,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w400,
-                    ),
-                    maxLines: crossAxisCount >= 4 ? 1 : 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              Text(
-                metric['change'] as String,
-                style: TextStyle(
-                  fontSize: crossAxisCount >= 4 ? 9 : 10,
-                  color: metric['color'] as Color,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+            );
+          },
         );
-      },
-    );
       },
     );
   }
@@ -2211,8 +2263,10 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildInvoiceVATBreakdown(Invoice invoice) {
     // Check if we have VAT data
-    final bool hasVATData = invoice.grossAmount != null && invoice.netAmount != null && invoice.vatAmount != null;
-    
+    final bool hasVATData = invoice.grossAmount != null &&
+        invoice.netAmount != null &&
+        invoice.vatAmount != null;
+
     if (hasVATData) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -2286,8 +2340,10 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildExpenseVATBreakdown(Expense expense) {
     // Check if we have VAT data
-    final bool hasVATData = expense.grossAmount != null && expense.netAmount != null && expense.vatAmount != null;
-    
+    final bool hasVATData = expense.grossAmount != null &&
+        expense.netAmount != null &&
+        expense.vatAmount != null;
+
     if (hasVATData) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
