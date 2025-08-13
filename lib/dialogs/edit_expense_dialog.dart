@@ -29,7 +29,7 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
   bool _isLoading = true;
 
   List<String> _categories = [];
-  
+
   // VAT-related fields
   VATRate? _selectedVATRate;
   VATCalculation? _vatCalculation;
@@ -53,7 +53,8 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
     print('💰 [EditExpenseDialog] - VAT Rate ID: ${widget.expense.vatRateId}');
     print('💰 [EditExpenseDialog] - Net Amount: ${widget.expense.netAmount}');
     print('💰 [EditExpenseDialog] - VAT Amount: ${widget.expense.vatAmount}');
-    print('💰 [EditExpenseDialog] - Gross Amount: ${widget.expense.grossAmount}');
+    print(
+        '💰 [EditExpenseDialog] - Gross Amount: ${widget.expense.grossAmount}');
     _initializeCompanyContext();
     _loadData();
     _loadVATRates();
@@ -92,7 +93,8 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
 
   Future<void> _loadVATRates() async {
     try {
-      final rates = await VATService.getVATRates(country: 'Ireland', activeOnly: true);
+      final rates =
+          await VATService.getVATRates(country: 'Ireland', activeOnly: true);
       setState(() {
         _vatRates = rates;
         _isLoadingVATRates = false;
@@ -320,7 +322,8 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
       print(
           '💰 [EditExpenseDialog] - Description: ${_descriptionController.text}');
       print('💰 [EditExpenseDialog] - Category: $_selectedCategory');
-      print('💰 [EditExpenseDialog] - Gross Amount: ${_grossAmountController.text}');
+      print(
+          '💰 [EditExpenseDialog] - Gross Amount: ${_grossAmountController.text}');
       print('💰 [EditExpenseDialog] - Date: $_selectedDate');
       print('💰 [EditExpenseDialog] - Notes: ${_notesController.text}');
 
@@ -336,7 +339,8 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
         status: widget.expense.status, // Keep existing status
         notes: _notesController.text,
         // VAT fields
-        vatRate: _selectedVATRate?.ratePercentage, // Keep for backward compatibility
+        vatRate:
+            _selectedVATRate?.ratePercentage, // Keep for backward compatibility
         vatRateId: _selectedVATRate?.id,
         vatAmount: _vatCalculation?.vatAmount,
         netAmount: _vatCalculation?.netAmount ?? netAmount,
@@ -438,176 +442,341 @@ class _EditExpenseDialogState extends State<EditExpenseDialog> {
       );
     }
 
-    return AlertDialog(
-      title: const Text('Edit Expense'),
-      content: SingleChildScrollView(
-        child: SizedBox(
-          width: 400,
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: 600,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+          maxWidth: MediaQuery.of(context).size.width * 0.95,
+        ),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit, color: Color(0xFF3B82F6)),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Edit Expense',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a description';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _selectedCategory,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    border: OutlineInputBorder(),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
                   ),
-                  items: _categories.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCategory = value!;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a category';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                // Gross Amount and VAT Rate Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _grossAmountController,
-                        decoration: InputDecoration(
-                          labelText: 'Gross Amount (inc VAT)',
-                          border: const OutlineInputBorder(),
-                          prefixText: _getCurrencySymbol(),
-                          helperText: 'Total amount including VAT',
+                ],
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+
+                      // Description Field
+                      TextFormField(
+                        controller: _descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
                         ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d{0,2}')),
-                        ],
-                        onChanged: (_) => setState(() {}), // Trigger rebuild for VAT calculation
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter an amount';
-                          }
-                          if (double.tryParse(value) == null) {
-                            return 'Please enter a valid amount';
+                            return 'Please enter a description';
                           }
                           return null;
                         },
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _isLoadingVATRates
-                          ? const Center(child: CircularProgressIndicator())
-                          : DropdownButtonFormField<VATRate>(
-                              value: _selectedVATRate,
-                              decoration: const InputDecoration(
-                                labelText: 'VAT Rate',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.percent),
-                                helperText: 'Ireland VAT rate',
-                              ),
-                              items: _vatRates
-                                  .map((rate) => DropdownMenuItem(
-                                        value: rate,
-                                        child: Text('${rate.rateName} (${rate.ratePercentage}%)'),
-                                      ))
-                                  .toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedVATRate = value;
-                                });
-                                // Trigger VAT calculation when rate changes
-                                _triggerVATCalculation();
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Net Amount Field (Read-only, calculated from VAT)
-                TextFormField(
-                  controller: _netAmountController,
-                  decoration: InputDecoration(
-                    labelText: 'Net Amount (ex VAT)',
-                    border: const OutlineInputBorder(),
-                    prefixText: _getCurrencySymbol(),
-                    helperText: 'Calculated automatically from gross amount',
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
-                  readOnly: true,
-                  style: TextStyle(color: Colors.grey[700]),
-                ),
-                const SizedBox(height: 16),
-                GrossVATCalculatorWidget(
-                  grossAmount: _getGrossAmount(),
-                  selectedVATRate: _selectedVATRate,
-                  businessUsagePercentage: 100.0, // Default to 100% for expenses
-                  onCalculationChanged: _onVATCalculationChanged,
-                  isLoading: _isLoadingVATRates,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Date: ${_selectedDate.toLocal().toString().split(' ')[0]}',
-                        style: Theme.of(context).textTheme.titleMedium,
+                      const SizedBox(height: 24),
+
+                      // Category Field
+                      DropdownButtonFormField<String>(
+                        value: _selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                        ),
+                        items: _categories.map((category) {
+                          return DropdownMenuItem(
+                            value: category,
+                            child: Text(category),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategory = value!;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a category';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
-                    ElevatedButton(
-                      onPressed: _selectDate,
-                      child: const Text('Select Date'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (Optional)',
-                    border: OutlineInputBorder(),
+                      // Amount & VAT Section
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Amount & VAT Details',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Responsive Layout for Amount and VAT
+                            MediaQuery.of(context).size.width < 500
+                                ? Column(
+                                    children: [
+                                      TextFormField(
+                                        controller: _grossAmountController,
+                                        decoration: InputDecoration(
+                                          labelText: 'Gross Amount (inc VAT)',
+                                          border: const OutlineInputBorder(),
+                                          prefixText: _getCurrencySymbol(),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 16),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          helperText: 'Total amount including VAT',
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.allow(
+                                              RegExp(r'^\d*\.?\d{0,2}')),
+                                        ],
+                                        onChanged: (_) => setState(() {}),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter an amount';
+                                          }
+                                          if (double.tryParse(value) == null) {
+                                            return 'Please enter a valid amount';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 20),
+                                      _isLoadingVATRates
+                                          ? const Center(child: CircularProgressIndicator())
+                                          : DropdownButtonFormField<VATRate>(
+                                              value: _selectedVATRate,
+                                              decoration: const InputDecoration(
+                                                labelText: 'VAT Rate',
+                                                border: OutlineInputBorder(),
+                                                prefixIcon: Icon(Icons.percent),
+                                                contentPadding: EdgeInsets.symmetric(
+                                                    horizontal: 16, vertical: 16),
+                                                filled: true,
+                                                fillColor: Colors.white,
+                                                helperText: 'Ireland VAT rate',
+                                              ),
+                                              items: _vatRates
+                                                  .map((rate) => DropdownMenuItem(
+                                                        value: rate,
+                                                        child: Text(
+                                                            '${rate.rateName} (${rate.ratePercentage}%)'),
+                                                      ))
+                                                  .toList(),
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  _selectedVATRate = value;
+                                                });
+                                                _triggerVATCalculation();
+                                              },
+                                            ),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _grossAmountController,
+                                          decoration: InputDecoration(
+                                            labelText: 'Gross Amount (inc VAT)',
+                                            border: const OutlineInputBorder(),
+                                            prefixText: _getCurrencySymbol(),
+                                            contentPadding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 16),
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            helperText: 'Total amount including VAT',
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.allow(
+                                                RegExp(r'^\d*\.?\d{0,2}')),
+                                          ],
+                                          onChanged: (_) => setState(() {}),
+                                          validator: (value) {
+                                            if (value == null || value.isEmpty) {
+                                              return 'Please enter an amount';
+                                            }
+                                            if (double.tryParse(value) == null) {
+                                              return 'Please enter a valid amount';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: _isLoadingVATRates
+                                            ? const Center(child: CircularProgressIndicator())
+                                            : DropdownButtonFormField<VATRate>(
+                                                value: _selectedVATRate,
+                                                decoration: const InputDecoration(
+                                                  labelText: 'VAT Rate',
+                                                  border: OutlineInputBorder(),
+                                                  prefixIcon: Icon(Icons.percent),
+                                                  contentPadding: EdgeInsets.symmetric(
+                                                      horizontal: 13, vertical: 13),
+                                                  filled: true,
+                                                  fillColor: Colors.white,
+                                                  helperText: 'Ireland VAT rate',
+                                                ),
+                                                items: _vatRates
+                                                    .map((rate) => DropdownMenuItem(
+                                                          value: rate,
+                                                          child: Text(
+                                                              '${rate.rateName} (${rate.ratePercentage}%)'),
+                                                        ))
+                                                    .toList(),
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _selectedVATRate = value;
+                                                  });
+                                                  _triggerVATCalculation();
+                                                },
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+
+                            // Net Amount Field (Read-only, calculated from VAT)
+                            TextFormField(
+                              controller: _netAmountController,
+                              decoration: InputDecoration(
+                                labelText: 'Net Amount (ex VAT)',
+                                border: const OutlineInputBorder(),
+                                prefixText: _getCurrencySymbol(),
+                                helperText: 'Calculated automatically from gross amount',
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 16),
+                                filled: true,
+                                fillColor: Colors.grey[50],
+                              ),
+                              readOnly: true,
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // VAT Calculator Widget
+                      GrossVATCalculatorWidget(
+                        grossAmount: _getGrossAmount(),
+                        selectedVATRate: _selectedVATRate,
+                        businessUsagePercentage: 100.0, // Default to 100% for expenses
+                        onCalculationChanged: _onVATCalculationChanged,
+                        isLoading: _isLoadingVATRates,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Date Field
+                      InkWell(
+                        onTap: _selectDate,
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Expense Date',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.calendar_today),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 16),
+                          ),
+                          child: Text(
+                            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Notes Field
+                      TextFormField(
+                        controller: _notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (Optional)',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                        ),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                   ),
-                  maxLines: 3,
                 ),
-              ],
+              ),
             ),
-          ),
+
+            // Fixed footer with buttons
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _updateExpense,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text('Update'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context)
-              .pop(), // Return null to indicate cancellation
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _updateExpense,
-          child: const Text('Update'),
-        ),
-      ],
     );
   }
 }
