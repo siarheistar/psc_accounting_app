@@ -100,10 +100,13 @@ class EnvironmentConfig:
             'SMTP_PORT': int(self.get_env('SMTP_PORT', '587')) if self.get_env('SMTP_PORT') else None,
             'SMTP_USER': self.get_env('SMTP_USER'),
             'SMTP_PASSWORD': self.get_env('SMTP_PASSWORD'),
+            # AWS/S3 Configuration - support multiple environment variable names
             'AWS_ACCESS_KEY_ID': self.get_env('AWS_ACCESS_KEY_ID'),
             'AWS_SECRET_ACCESS_KEY': self.get_env('AWS_SECRET_ACCESS_KEY'),
-            'AWS_S3_BUCKET': self.get_env('AWS_S3_BUCKET'),
+            'AWS_S3_BUCKET': self.get_env('AWS_S3_BUCKET') or self.get_env('S3_BUCKET'),
             'AWS_REGION': self.get_env('AWS_REGION', 'us-west-2'),
+            'S3_BUCKET': self.get_env('S3_BUCKET') or self.get_env('AWS_S3_BUCKET', 'psc-accounting'),
+            'STORAGE_BACKEND': self.get_env('STORAGE_BACKEND', 'local'),
         })
     
     def _validate_required_vars(self) -> None:
@@ -151,7 +154,11 @@ class EnvironmentConfig:
         logger.info(f"  Debug: {safe_config.get('DEBUG')}")
         logger.info(f"  Database: {safe_config.get('DB_HOST')}:{safe_config.get('DB_PORT')}/{safe_config.get('DB_NAME')}")
         logger.info(f"  Schema: {safe_config.get('DB_SCHEMA')}")
-        logger.info(f"  Storage Mode: {safe_config.get('STORAGE_MODE')}")
+        logger.info(f"  Storage Backend: {safe_config.get('STORAGE_BACKEND')}")
+        if safe_config.get('STORAGE_BACKEND') == 's3':
+            logger.info(f"  S3 Bucket: {safe_config.get('S3_BUCKET')}")
+            logger.info(f"  S3 Region: {safe_config.get('AWS_REGION')}")
+            logger.info(f"  AWS Credentials: {'✅ Configured' if safe_config.get('AWS_ACCESS_KEY_ID') else '❌ Missing'}")
         logger.info(f"  API: {safe_config.get('API_HOST')}:{safe_config.get('API_PORT')}")
     
     @staticmethod
@@ -214,6 +221,41 @@ class EnvironmentConfig:
         """
         required_db_vars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
         return all(self.config.get(var) for var in required_db_vars)
+    
+    def validate_s3_configuration(self) -> bool:
+        """
+        Validate S3 configuration when S3 backend is enabled
+        
+        Returns:
+            True if valid, False otherwise
+        """
+        if self.config.get('STORAGE_BACKEND') != 's3':
+            return True  # S3 validation not needed for local storage
+        
+        required_s3_vars = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'S3_BUCKET', 'AWS_REGION']
+        missing_vars = [var for var in required_s3_vars if not self.config.get(var)]
+        
+        if missing_vars:
+            logger.warning(f"⚠️ S3 backend selected but missing variables: {missing_vars}")
+            logger.warning("Application will fall back to local storage")
+            return False
+        
+        logger.info("✅ S3 configuration validated successfully")
+        return True
+    
+    def get_s3_config(self) -> Dict[str, str]:
+        """
+        Get S3 configuration for storage manager
+        
+        Returns:
+            Dictionary with S3 configuration
+        """
+        return {
+            'bucket_name': self.config.get('S3_BUCKET', 'psc-accounting'),
+            'region_name': self.config.get('AWS_REGION', 'us-west-2'),
+            'aws_access_key_id': self.config.get('AWS_ACCESS_KEY_ID'),
+            'aws_secret_access_key': self.config.get('AWS_SECRET_ACCESS_KEY')
+        }
 
 
 # Global configuration instance
