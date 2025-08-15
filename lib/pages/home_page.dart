@@ -733,6 +733,265 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  PreferredSizeWidget _buildResponsiveAppBar(BuildContext context, bool isDemoMode, User? user) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+    final isMediumScreen = screenWidth < 1024;
+    
+    return PreferredSize(
+      preferredSize: Size.fromHeight(isSmallScreen ? 56 : 64),
+      child: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
+        toolbarHeight: isSmallScreen ? 56 : 64,
+        title: _buildAppBarTitle(isDemoMode, isSmallScreen),
+        actions: _buildAppBarActions(isDemoMode, user, isSmallScreen, isMediumScreen),
+        flexibleSpace: isSmallScreen ? null : Container(
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Colors.grey[200]!,
+                width: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBarTitle(bool isDemoMode, bool isSmallScreen) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.account_balance,
+          color: isDemoMode ? Colors.orange : Colors.blue,
+          size: isSmallScreen ? 20 : 24,
+        ),
+        SizedBox(width: isSmallScreen ? 6 : 8),
+        Flexible(
+          child: Text(
+            isSmallScreen 
+              ? 'PSC Accounting'
+              : (isDemoMode ? 'PSC Accounting - Demo' : 'PSC Accounting'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: isSmallScreen ? 16 : 18,
+              color: isDemoMode ? Colors.orange : const Color(0xFF1E293B),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildAppBarActions(bool isDemoMode, User? user, bool isSmallScreen, bool isMediumScreen) {
+    final actions = <Widget>[];
+    
+    if (isSmallScreen) {
+      // Mobile: Show only essential actions + overflow menu
+      actions.addAll([
+        _buildActionButton(
+          icon: Icons.receipt_long,
+          tooltip: 'Add Invoice',
+          onPressed: _getAddAction(() => _showAddInvoiceDialog()),
+          isDemoMode: isDemoMode,
+          isCompact: true,
+        ),
+        _buildActionButton(
+          icon: Icons.money_off,
+          tooltip: 'Add Expense', 
+          onPressed: _getAddAction(() => _showAddExpenseDialog()),
+          isDemoMode: isDemoMode,
+          isCompact: true,
+        ),
+        _buildOverflowMenu(isDemoMode, user),
+      ]);
+    } else if (isMediumScreen) {
+      // Tablet: Show most actions, some in overflow
+      actions.addAll([
+        _buildActionButton(
+          icon: Icons.receipt_long,
+          tooltip: 'Add Invoice',
+          onPressed: _getAddAction(() => _showAddInvoiceDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        _buildActionButton(
+          icon: Icons.money_off,
+          tooltip: 'Add Expense',
+          onPressed: _getAddAction(() => _showAddExpenseDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        _buildActionButton(
+          icon: Icons.person,
+          tooltip: 'Add Payroll',
+          onPressed: _getAddAction(() => _showAddPayrollDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        _buildOverflowMenu(isDemoMode, user),
+      ]);
+    } else {
+      // Desktop: Show all actions
+      actions.addAll([
+        _buildActionButton(
+          icon: Icons.receipt_long,
+          tooltip: 'Add Invoice',
+          onPressed: _getAddAction(() => _showAddInvoiceDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        _buildActionButton(
+          icon: Icons.money_off,
+          tooltip: 'Add Expense',
+          onPressed: _getAddAction(() => _showAddExpenseDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        _buildActionButton(
+          icon: Icons.person,
+          tooltip: 'Add Payroll',
+          onPressed: _getAddAction(() => _showAddPayrollDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        _buildActionButton(
+          icon: Icons.account_balance,
+          tooltip: 'Add Bank Statement',
+          onPressed: _getAddAction(() => _showAddBankStatementDialog()),
+          isDemoMode: isDemoMode,
+        ),
+        const SizedBox(width: 8),
+        _buildActionButton(
+          icon: Icons.info_outline,
+          tooltip: 'Company Info',
+          onPressed: () => _showCompanyInfo(),
+          isDemoMode: isDemoMode,
+        ),
+        _buildUserAvatar(isDemoMode, user),
+      ]);
+    }
+    
+    return actions;
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required bool isDemoMode,
+    bool isCompact = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(
+          icon,
+          color: isDemoMode ? Colors.orange : Colors.blue,
+          size: isCompact ? 20 : 24,
+        ),
+        tooltip: tooltip,
+        constraints: BoxConstraints(
+          minWidth: isCompact ? 36 : 44,
+          minHeight: isCompact ? 36 : 44,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverflowMenu(bool isDemoMode, User? user) {
+    return PopupMenuButton<String>(
+      icon: Icon(
+        Icons.more_vert,
+        color: isDemoMode ? Colors.orange : Colors.blue,
+      ),
+      tooltip: 'More options',
+      onSelected: (value) {
+        switch (value) {
+          case 'payroll':
+            _getAddAction(() => _showAddPayrollDialog())();
+            break;
+          case 'bank':
+            _getAddAction(() => _showAddBankStatementDialog())();
+            break;
+          case 'info':
+            _showCompanyInfo();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'payroll',
+          child: ListTile(
+            leading: Icon(Icons.person),
+            title: Text('Add Payroll'),
+            dense: true,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'bank',
+          child: ListTile(
+            leading: Icon(Icons.account_balance),
+            title: Text('Add Bank Statement'),
+            dense: true,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'info',
+          child: ListTile(
+            leading: Icon(Icons.info_outline),
+            title: Text('Company Info'),
+            dense: true,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUserAvatar(bool isDemoMode, User? user) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: isDemoMode ? Colors.orange : Colors.blue,
+        child: user?.photoURL != null
+            ? ClipOval(
+                child: Image.network(
+                  user!.photoURL!,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Text(
+                      user.displayName?.substring(0, 1).toUpperCase() ?? 'U',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    );
+                  },
+                ),
+              )
+            : Text(
+                user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+      ),
+    );
+  }
+
+  VoidCallback _getAddAction(VoidCallback action) {
+    return _dbService.isDemoMode
+        ? () => _showSnackBar(
+            'Demo mode - Create a real company to add transactions',
+            isError: true)
+        : action;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -740,127 +999,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
-        title: Row(
-          children: [
-            Icon(
-              Icons.account_balance,
-              color: isDemoMode ? Colors.orange : Colors.blue,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              isDemoMode ? 'PSC Accounting - Demo' : 'PSC Accounting',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isDemoMode ? Colors.orange : const Color(0xFF1E293B),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // Add Invoice button
-          IconButton(
-            onPressed: _dbService.isDemoMode
-                ? () => _showSnackBar(
-                    'Demo mode - Create a real company to add transactions',
-                    isError: true)
-                : () => _showAddInvoiceDialog(),
-            icon: Icon(
-              Icons.receipt_long,
-              color: isDemoMode ? Colors.orange : Colors.blue,
-            ),
-            tooltip: 'Add Invoice',
-          ),
-          // Add Expense button
-          IconButton(
-            onPressed: _dbService.isDemoMode
-                ? () => _showSnackBar(
-                    'Demo mode - Create a real company to add transactions',
-                    isError: true)
-                : () => _showAddExpenseDialog(),
-            icon: Icon(
-              Icons.money_off,
-              color: isDemoMode ? Colors.orange : Colors.blue,
-            ),
-            tooltip: 'Add Expense',
-          ),
-          // Add Payroll button
-          IconButton(
-            onPressed: _dbService.isDemoMode
-                ? () => _showSnackBar(
-                    'Demo mode - Create a real company to add transactions',
-                    isError: true)
-                : () => _showAddPayrollDialog(),
-            icon: Icon(
-              Icons.person,
-              color: isDemoMode ? Colors.orange : Colors.blue,
-            ),
-            tooltip: 'Add Payroll',
-          ),
-          // Add Bank Statement button
-          IconButton(
-            onPressed: _dbService.isDemoMode
-                ? () => _showSnackBar(
-                    'Demo mode - Create a real company to add transactions',
-                    isError: true)
-                : () => _showAddBankStatementDialog(),
-            icon: Icon(
-              Icons.account_balance,
-              color: isDemoMode ? Colors.orange : Colors.blue,
-            ),
-            tooltip: 'Add Bank Statement',
-          ),
-          const SizedBox(width: 8),
-          // Company info button
-          IconButton(
-            onPressed: () => _showCompanyInfo(),
-            icon: Icon(
-              Icons.info_outline,
-              color: isDemoMode ? Colors.orange : Colors.blue,
-            ),
-            tooltip: 'Company Info',
-          ),
-          // User profile
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: isDemoMode ? Colors.orange : Colors.blue,
-              child: user?.photoURL != null
-                  ? ClipOval(
-                      child: Image.network(
-                        user!.photoURL!,
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Text(
-                            user.displayName?.substring(0, 1).toUpperCase() ??
-                                'U',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                  : Text(
-                      user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
+      appBar: _buildResponsiveAppBar(context, isDemoMode, user),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
