@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
@@ -15,16 +16,63 @@ from pathlib import Path
 # Import your existing database module
 from database import initialize_db_pool, close_db_pool, execute_query
 
-# Import new attachment system
-from attachment_manager import AttachmentManager
+# Import new unified attachment system
+from unified_attachment_manager import UnifiedAttachmentManager
 import attachment_endpoints
 
 # Import VAT endpoints
 from vat_endpoints import router as vat_router
 
-app = FastAPI(title="PSC Accounting API", version="1.0.0")
-
 # ================== GLOBAL VARIABLES ==================
+
+# Configuration for attachment storage
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local")  # "local" or "s3"
+S3_BUCKET = os.getenv("S3_BUCKET", "psc-accounting")
+S3_REGION = os.getenv("AWS_REGION", "us-east-1")
+UPLOAD_DIR = Path("uploads")
+PDF_DIR = UPLOAD_DIR / "pdfs"  # Legacy PDF directory
+
+# Ensure legacy upload directories exist for backward compatibility
+PDF_DIR.mkdir(parents=True, exist_ok=True)
+
+# Initialize unified attachment manager on startup
+attachment_manager = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    global attachment_manager
+    print("🚀 [Backend] Starting PSC Accounting API...")
+    if initialize_db_pool():
+        print("✅ [Backend] Database connection established")
+    else:
+        print("❌ [Backend] Failed to connect to database - API will not work properly")
+    
+    # Initialize unified attachment system with configurable backend
+    try:
+        attachment_manager = UnifiedAttachmentManager(
+            storage_backend=STORAGE_BACKEND,
+            upload_dir=str(UPLOAD_DIR),
+            s3_bucket=S3_BUCKET,
+            s3_region=S3_REGION
+        )
+        print(f"✅ [Backend] Unified attachment system initialized with {STORAGE_BACKEND.upper()} backend")
+    except Exception as e:
+        print(f"⚠️ [Backend] Failed to initialize attachment system: {e}")
+    
+    print(f"📁 [Backend] Active storage backend: {STORAGE_BACKEND.upper()}")
+    if STORAGE_BACKEND == "s3":
+        print(f"☁️ [Backend] S3 Configuration - Bucket: {S3_BUCKET}, Region: {S3_REGION}")
+    else:
+        print(f"💾 [Backend] Local storage directory: {UPLOAD_DIR.absolute()}")
+    
+    yield
+    
+    # Shutdown
+    print("🛑 [Backend] Shutting down PSC Accounting API...")
+    close_db_pool()
+
+app = FastAPI(title="PSC Accounting API", version="1.0.0", lifespan=lifespan)
 
 # ================== PYDANTIC MODELS ==================
 
@@ -42,42 +90,6 @@ class User(BaseModel):
     firebase_uid: str
     email: Optional[str] = None
     created_at: str
-
-# Configuration for file storage (legacy - now using AttachmentManager)
-STORAGE_MODE = os.getenv("STORAGE_MODE", "local")  # "local" or "database"
-UPLOAD_DIR = Path("uploads")
-PDF_DIR = UPLOAD_DIR / "pdfs"  # Legacy PDF directory
-
-# Ensure legacy upload directories exist for backward compatibility
-PDF_DIR.mkdir(parents=True, exist_ok=True)
-
-# Initialize attachment manager on startup
-attachment_manager = None
-
-# Initialize database connection on startup
-@app.on_event("startup")
-async def startup_event():
-    global attachment_manager
-    print("🚀 [Backend] Starting PSC Accounting API...")
-    if initialize_db_pool():
-        print("✅ [Backend] Database connection established")
-    else:
-        print("❌ [Backend] Failed to connect to database - API will not work properly")
-    
-    # Initialize new attachment system
-    try:
-        attachment_manager = AttachmentManager()
-        print("✅ [Backend] Attachment system initialized")
-    except Exception as e:
-        print(f"⚠️ [Backend] Failed to initialize attachment system: {e}")
-    
-    print(f"📁 [Backend] Storage mode: {STORAGE_MODE} (legacy setting)")
-    print(f"📁 [Backend] New attachment system active with local storage")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    print("🛑 [Backend] Shutting down PSC Accounting API...")
-    close_db_pool()
 
 # Enable CORS for Flutter app
 app.add_middleware(
@@ -896,8 +908,7 @@ async def get_dashboard_by_path(company_id: str):
 
 # ================== ATTACHMENT ENDPOINTS ==================
 
-# Initialize attachment manager
-attachment_manager = AttachmentManager()
+# Note: attachment_manager is initialized in startup_event() as UnifiedAttachmentManager
 
 @app.post("/attachments/upload")
 async def upload_attachment(
@@ -2112,26 +2123,47 @@ async def delete_bank_statement(statement_id: int, company_id: str = Query(..., 
         print(f"❌ [Backend] Delete bank statement error: {e}")
         raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
-# ================== STORAGE CONFIGURATION ==================
+# ================== STORAGE MANAGEMENT ENDPOINTS ==================
+
+# Import storage management endpoints
+import storage_management_endpoints
+
+@app.get("/storage/info", tags=["Storage Management"])
+async def storage_info():
+    """Get current storage configuration and statistics"""
+    return await storage_management_endpoints.get_storage_info()
+
+@app.post("/storage/migrate-to-s3", tags=["Storage Management"])
+async def migrate_to_s3(company_id: Optional[int] = Query(None), dry_run: bool = Query(False)):
+    """Migrate local attachments to S3 storage"""
+    return await storage_management_endpoints.migrate_to_s3(company_id, dry_run)
+
+@app.get("/storage/test-s3", tags=["Storage Management"])
+async def test_s3():
+    """Test S3 connection and bucket access"""
+    return await storage_management_endpoints.test_s3_connection()
+
+@app.post("/storage/cleanup", tags=["Storage Management"])
+async def cleanup_storage(storage_backend: str = Query(...), company_id: Optional[int] = Query(None), orphaned_only: bool = Query(True)):
+    """Clean up storage by removing orphaned files"""
+    return await storage_management_endpoints.cleanup_storage(storage_backend, company_id, orphaned_only)
+
+@app.get("/storage/usage-by-company", tags=["Storage Management"])
+async def storage_usage_by_company():
+    """Get storage usage statistics grouped by company"""
+    return await storage_management_endpoints.get_storage_usage_by_company()
+
+# ================== LEGACY STORAGE CONFIGURATION ==================
 
 @app.get("/storage/config")
 async def get_storage_config():
-    """Get current storage configuration"""
+    """Get current storage configuration (legacy endpoint)"""
     return {
-        "storage_mode": STORAGE_MODE,
-        "upload_directory": str(PDF_DIR.absolute()) if STORAGE_MODE == "local" else None,
-        "supported_modes": ["local", "database"]
-    }
-
-@app.post("/storage/config")
-async def set_storage_config(mode: str = Query(..., regex="^(local|database)$")):
-    """Set storage mode (requires restart)"""
-    global STORAGE_MODE
-    STORAGE_MODE = mode
-    print(f"📁 [Backend] Storage mode changed to: {STORAGE_MODE}")
-    return {
-        "message": f"Storage mode set to {STORAGE_MODE}",
-        "note": "Restart required for full effect"
+        "storage_backend": STORAGE_BACKEND,
+        "s3_bucket": S3_BUCKET if STORAGE_BACKEND == "s3" else None,
+        "s3_region": S3_REGION if STORAGE_BACKEND == "s3" else None,
+        "upload_directory": str(UPLOAD_DIR.absolute()),
+        "supported_backends": ["local", "s3"]
     }
 
 # ================== YOUR EXISTING ENDPOINTS ==================

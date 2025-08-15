@@ -1,0 +1,46 @@
+# PSC Accounting - Environment Configuration Template
+# Copy this file to .env and configure your settings
+
+# ================== STORAGE CONFIGURATION ==================
+
+# Storage Backend: "local" for local file storage, "s3" for AWS S3
+STORAGE_BACKEND=local
+
+# AWS S3 Configuration (only required if STORAGE_BACKEND=s3)
+S3_BUCKET=psc-accounting
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_key_here
+
+# ================== DATABASE CONFIGURATION ==================
+
+# PostgreSQL Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/psc_accounting
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=psc_accounting
+DB_USER=username
+DB_PASSWORD=password
+
+# ================== API CONFIGURATION ==================
+
+# API Server Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=true
+
+# CORS Configuration
+CORS_ORIGINS=*
+
+# ================== SECURITY CONFIGURATION ==================
+
+# JWT Secret (for future authentication features)
+JWT_SECRET=your_jwt_secret_here
+
+# ================== DEVELOPMENT SETTINGS ==================
+
+# Enable detailed logging
+VERBOSE_LOGGING=true
+
+# Enable development features
+DEVELOPMENT_MODE=true

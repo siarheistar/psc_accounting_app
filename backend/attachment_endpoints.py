@@ -1,16 +1,26 @@
 """
 Attachment API Endpoints for PSC Accounting
-Replaces the old PDF-specific document endpoints with universal attachment support
+Universal attachment support with configurable S3 or local storage backend
 """
 
 from fastapi import HTTPException, UploadFile, File, Query, Form
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
 import io
-from attachment_manager import AttachmentManager
+from unified_attachment_manager import UnifiedAttachmentManager
+import os
 
-# Initialize attachment manager
-attachment_manager = AttachmentManager()
+# Initialize unified attachment manager with environment configuration
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local")  # "local" or "s3"
+S3_BUCKET = os.getenv("S3_BUCKET", "psc-accounting")
+S3_REGION = os.getenv("AWS_REGION", "us-east-1")
+
+attachment_manager = UnifiedAttachmentManager(
+    storage_backend=STORAGE_BACKEND,
+    upload_dir="uploads",
+    s3_bucket=S3_BUCKET,
+    s3_region=S3_REGION
+)
 
 async def upload_attachment(
     entity_type: str = Query(..., description="Type of entity (invoice, expense, payroll, bank_statement)"),
