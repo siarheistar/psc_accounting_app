@@ -364,7 +364,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                         leading: const Icon(Icons.attach_file),
                         title: Text(filename),
                         subtitle: Text(
-                            'Uploaded: ${attachment['uploaded_at']?.substring(0, 10) ?? 'Unknown'}'),
+                            'Uploaded: ${attachment['created_at']?.substring(0, 10) ?? 'Unknown'}'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

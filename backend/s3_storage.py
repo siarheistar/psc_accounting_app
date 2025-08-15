@@ -7,6 +7,8 @@ import os
 import boto3
 import uuid
 import mimetypes
+import base64
+import unicodedata
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
@@ -112,6 +114,34 @@ class S3StorageManager:
         except Exception as e:
             raise Exception(f"Failed to create bucket {self.bucket_name}: {e}")
     
+    def _sanitize_for_s3_metadata(self, value: str) -> str:
+        """
+        Sanitize string for S3 metadata (ASCII only)
+        Non-ASCII characters are encoded using base64
+        """
+        try:
+            # Try to encode as ASCII - if it works, return as-is
+            value.encode('ascii')
+            return value
+        except UnicodeEncodeError:
+            # If non-ASCII characters, encode the string as base64
+            encoded_bytes = value.encode('utf-8')
+            encoded_str = base64.b64encode(encoded_bytes).decode('ascii')
+            return f"base64:{encoded_str}"
+    
+    def _decode_s3_metadata(self, value: str) -> str:
+        """
+        Decode S3 metadata that may have been base64 encoded
+        """
+        if value.startswith('base64:'):
+            try:
+                encoded_str = value[7:]  # Remove 'base64:' prefix
+                decoded_bytes = base64.b64decode(encoded_str)
+                return decoded_bytes.decode('utf-8')
+            except Exception:
+                return value  # Return as-is if decoding fails
+        return value
+
     def generate_s3_key(self, entity_type: str, company_id: int, original_filename: str) -> str:
         """
         Generate S3 object key with organized structure
@@ -121,8 +151,12 @@ class S3StorageManager:
         timestamp = datetime.now().strftime("%H%M%S")
         unique_id = uuid.uuid4().hex[:8]
         
-        # Sanitize filename for S3
-        safe_filename = "".join(c for c in original_filename if c.isalnum() or c in "._-").strip()
+        # Sanitize filename for S3 (keep original characters for the key)
+        # S3 keys can contain Unicode, but metadata cannot
+        # Remove problematic characters but preserve the original name structure
+        safe_filename = "".join(c for c in original_filename if c not in ['/', '\\', '?', '*', ':', '|', '<', '>', '"']).strip()
+        if not safe_filename:
+            safe_filename = f"file_{unique_id}.bin"
         
         s3_key = f"attachments/{entity_type}/company_{company_id}/{current_date}/{timestamp}_{unique_id}_{safe_filename}"
         
@@ -143,16 +177,16 @@ class S3StorageManager:
             # Determine content type
             content_type = mimetypes.guess_type(original_filename)[0] or 'application/octet-stream'
             
-            # Prepare metadata
+            # Prepare metadata (S3 metadata must be ASCII-only)
             metadata = {
-                'entity_type': entity_type,
+                'entity_type': self._sanitize_for_s3_metadata(entity_type),
                 'company_id': str(company_id),
-                'original_filename': original_filename,
+                'original_filename': self._sanitize_for_s3_metadata(original_filename),
                 'upload_timestamp': datetime.now().isoformat(),
             }
             
             if description:
-                metadata['description'] = description
+                metadata['description'] = self._sanitize_for_s3_metadata(description)
             
             # Upload to S3
             self.s3_client.put_object(
@@ -192,11 +226,17 @@ class S3StorageManager:
             
             file_content = response['Body'].read()
             
+            # Decode any base64-encoded metadata
+            raw_metadata = response.get('Metadata', {})
+            decoded_metadata = {}
+            for key, value in raw_metadata.items():
+                decoded_metadata[key] = self._decode_s3_metadata(value)
+            
             metadata = {
                 'content_type': response.get('ContentType', 'application/octet-stream'),
                 'content_length': response.get('ContentLength', 0),
                 'last_modified': response.get('LastModified'),
-                'metadata': response.get('Metadata', {}),
+                'metadata': decoded_metadata,
                 'etag': response.get('ETag', '').strip('"')
             }
             
@@ -257,13 +297,19 @@ class S3StorageManager:
         try:
             response = self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_key)
             
+            # Decode any base64-encoded metadata
+            raw_metadata = response.get('Metadata', {})
+            decoded_metadata = {}
+            for key, value in raw_metadata.items():
+                decoded_metadata[key] = self._decode_s3_metadata(value)
+            
             info = {
                 'key': s3_key,
                 'size': response.get('ContentLength', 0),
                 'content_type': response.get('ContentType', 'application/octet-stream'),
                 'last_modified': response.get('LastModified'),
                 'etag': response.get('ETag', '').strip('"'),
-                'metadata': response.get('Metadata', {}),
+                'metadata': decoded_metadata,
                 'server_side_encryption': response.get('ServerSideEncryption'),
                 'storage_class': response.get('StorageClass', 'STANDARD')
             }

@@ -209,11 +209,11 @@ class BankStatement(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "PSC Accounting API is running", "storage_mode": STORAGE_MODE}
+    return {"message": "PSC Accounting API is running", "storage_backend": STORAGE_BACKEND}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "storage_mode": STORAGE_MODE}
+    return {"status": "healthy", "storage_backend": STORAGE_BACKEND}
 
 # ================== COMPANY ENDPOINTS ==================
 
