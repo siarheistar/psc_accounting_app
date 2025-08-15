@@ -1776,37 +1776,33 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _showPDFOptions('invoice', invoice.id),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.attach_file,
-                        size: 14,
-                        color: Colors.blue,
-                      ),
-                    ),
+                  const SizedBox(width: 4),
+                  _buildInvoiceActionButton(
+                    icon: Icons.edit,
+                    tooltip: 'Edit',
+                    onPressed: () => _editInvoiceFromDashboard(invoice),
+                    color: Colors.blue,
                   ),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => _showEditDeleteOptions('invoice', invoice),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.more_vert,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
+                  const SizedBox(width: 2),
+                  _buildInvoiceActionButton(
+                    icon: Icons.attach_file,
+                    tooltip: 'Add Attachment',
+                    onPressed: () => _uploadInvoiceAttachmentFromDashboard(invoice.id),
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildInvoiceActionButton(
+                    icon: Icons.visibility,
+                    tooltip: 'View Attachments',
+                    onPressed: () => _viewInvoiceAttachmentsFromDashboard(invoice.id),
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildInvoiceActionButton(
+                    icon: Icons.delete,
+                    tooltip: 'Delete',
+                    onPressed: () => _deleteInvoiceFromDashboard(invoice),
+                    color: Colors.red,
                   ),
                 ],
               ),
@@ -1885,36 +1881,32 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
-                    onTap: () => _showPDFOptions('expense', expense.id),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.attach_file,
-                        size: 14,
-                        color: Colors.blue,
-                      ),
-                    ),
+                  _buildExpenseActionButton(
+                    icon: Icons.edit,
+                    tooltip: 'Edit',
+                    onPressed: () => _editExpenseFromDashboard(expense),
+                    color: Colors.blue,
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _showEditDeleteOptions('expense', expense),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.more_vert,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
+                  const SizedBox(width: 2),
+                  _buildExpenseActionButton(
+                    icon: Icons.attach_file,
+                    tooltip: 'Add Attachment',
+                    onPressed: () => _uploadExpenseAttachmentFromDashboard(expense.id),
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildExpenseActionButton(
+                    icon: Icons.visibility,
+                    tooltip: 'View Attachments',
+                    onPressed: () => _viewExpenseAttachmentsFromDashboard(expense.id),
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildExpenseActionButton(
+                    icon: Icons.delete,
+                    tooltip: 'Delete',
+                    onPressed: () => _deleteExpenseFromDashboard(expense),
+                    color: Colors.red,
                   ),
                 ],
               ),
@@ -2022,36 +2014,32 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
-                    onTap: () => _showPDFOptions('payroll', entry.id),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.attach_file,
-                        size: 14,
-                        color: Colors.blue,
-                      ),
-                    ),
+                  _buildPayrollActionButton(
+                    icon: Icons.edit,
+                    tooltip: 'Edit',
+                    onPressed: () => _editPayrollFromDashboard(entry),
+                    color: Colors.blue,
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _showEditDeleteOptions('payroll', entry),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.more_vert,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
+                  const SizedBox(width: 2),
+                  _buildPayrollActionButton(
+                    icon: Icons.attach_file,
+                    tooltip: 'Add Attachment',
+                    onPressed: () => _uploadPayrollAttachmentFromDashboard(entry.id),
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildPayrollActionButton(
+                    icon: Icons.visibility,
+                    tooltip: 'View Attachments',
+                    onPressed: () => _viewPayrollAttachmentsFromDashboard(entry.id),
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildPayrollActionButton(
+                    icon: Icons.delete,
+                    tooltip: 'Delete',
+                    onPressed: () => _deletePayrollFromDashboard(entry),
+                    color: Colors.red,
                   ),
                 ],
               ),
@@ -2164,38 +2152,32 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
-                    onTap: () =>
-                        _showPDFOptions('bank_statement', statement.id),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.attach_file,
-                        size: 14,
-                        color: Colors.blue,
-                      ),
-                    ),
+                  _buildBankStatementActionButton(
+                    icon: Icons.edit,
+                    tooltip: 'Edit',
+                    onPressed: () => _editBankStatementFromDashboard(statement),
+                    color: Colors.blue,
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () =>
-                        _showEditDeleteOptions('bank_statement', statement),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.more_vert,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
+                  const SizedBox(width: 2),
+                  _buildBankStatementActionButton(
+                    icon: Icons.attach_file,
+                    tooltip: 'Add Attachment',
+                    onPressed: () => _uploadBankStatementAttachmentFromDashboard(statement.id),
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildBankStatementActionButton(
+                    icon: Icons.visibility,
+                    tooltip: 'View Attachments',
+                    onPressed: () => _viewBankStatementAttachmentsFromDashboard(statement.id),
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 2),
+                  _buildBankStatementActionButton(
+                    icon: Icons.delete,
+                    tooltip: 'Delete',
+                    onPressed: () => _deleteBankStatementFromDashboard(statement),
+                    color: Colors.red,
                   ),
                 ],
               ),
@@ -2569,6 +2551,536 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       );
+    }
+  }
+
+  // Action button builders for reusable compact buttons
+  Widget _buildInvoiceActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(
+          icon,
+          size: 12,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpenseActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(
+          icon,
+          size: 12,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPayrollActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(
+          icon,
+          size: 12,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBankStatementActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(
+          icon,
+          size: 12,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  // Invoice methods reusing existing code from InvoicesPage
+  void _editInvoiceFromDashboard(Invoice invoice) async {
+    print('🧾 [HomePage] Edit invoice clicked for: ${invoice.invoiceNumber}');
+    final result = await showDialog<Invoice>(
+      context: context,
+      builder: (BuildContext context) {
+        return EditInvoiceDialog(invoice: invoice);
+      },
+    );
+    if (result != null) {
+      print('🧾 [HomePage] Edit dialog closed, refreshing dashboard...');
+      await _loadDashboardData();
+    }
+  }
+
+  void _deleteInvoiceFromDashboard(Invoice invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Invoice'),
+          content: Text(
+              'Are you sure you want to delete invoice ${invoice.invoiceNumber}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        print('🗑️ [HomePage] === DELETE INVOICE ===');
+        print('🗑️ [HomePage] Invoice ID: ${invoice.id}');
+        print('🗑️ [HomePage] Invoice Number: ${invoice.invoiceNumber}');
+        
+        await _dbService.deleteInvoice(invoice.id);
+        await _loadDashboardData();
+        _showSnackBar('Invoice deleted successfully');
+      } catch (e) {
+        print('🗑️ [HomePage] === DELETE ERROR ===');
+        print('🗑️ [HomePage] Exception: $e');
+        _showSnackBar('Failed to delete invoice: $e', isError: true);
+      }
+    }
+  }
+
+  void _uploadInvoiceAttachmentFromDashboard(String invoiceId) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final bytes = file.bytes;
+
+        if (bytes != null) {
+          if (bytes.length > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.', isError: true);
+            return;
+          }
+
+          await _uploadPDFToServer('invoice', invoiceId, file.name, bytes);
+          _showSnackBar('Attachment uploaded successfully');
+          await _loadDashboardData();
+        }
+      }
+    } catch (e) {
+      _showSnackBar('Failed to upload attachment: $e', isError: true);
+    }
+  }
+
+  void _viewInvoiceAttachmentsFromDashboard(String invoiceId) async {
+    try {
+      final attachments = await _getPDFAttachments('invoice', invoiceId);
+      _showAttachmentsDialog(attachments, invoiceId, 'invoice');
+    } catch (e) {
+      _showSnackBar('Error loading attachments: $e', isError: true);
+    }
+  }
+
+  // Expense methods reusing existing code from ExpensesPage
+  void _editExpenseFromDashboard(Expense expense) async {
+    print('💰 [HomePage] Edit expense clicked for: ${expense.description}');
+    final result = await showDialog<Expense>(
+      context: context,
+      builder: (BuildContext context) {
+        return EditExpenseDialog(expense: expense);
+      },
+    );
+    if (result != null) {
+      print('💰 [HomePage] Edit dialog closed, refreshing dashboard...');
+      await _loadDashboardData();
+    }
+  }
+
+  void _deleteExpenseFromDashboard(Expense expense) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Expense'),
+          content: Text(
+              'Are you sure you want to delete this expense: ${expense.description}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        await _dbService.deleteExpense(expense.id);
+        await _loadDashboardData();
+        _showSnackBar('Expense deleted successfully');
+      } catch (e) {
+        _showSnackBar('Failed to delete expense: $e', isError: true);
+      }
+    }
+  }
+
+  void _uploadExpenseAttachmentFromDashboard(String expenseId) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final bytes = file.bytes;
+
+        if (bytes != null) {
+          if (bytes.length > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.', isError: true);
+            return;
+          }
+
+          await _uploadPDFToServer('expense', expenseId, file.name, bytes);
+          _showSnackBar('Attachment uploaded successfully');
+          await _loadDashboardData();
+        }
+      }
+    } catch (e) {
+      _showSnackBar('Failed to upload attachment: $e', isError: true);
+    }
+  }
+
+  void _viewExpenseAttachmentsFromDashboard(String expenseId) async {
+    try {
+      final attachments = await _getPDFAttachments('expense', expenseId);
+      _showAttachmentsDialog(attachments, expenseId, 'expense');
+    } catch (e) {
+      _showSnackBar('Error loading attachments: $e', isError: true);
+    }
+  }
+
+  // Payroll methods reusing existing code pattern
+  void _editPayrollFromDashboard(PayrollEntry entry) async {
+    print('👤 [HomePage] Edit payroll clicked for: ${entry.employeeName}');
+    final result = await showDialog<PayrollEntry>(
+      context: context,
+      builder: (BuildContext context) {
+        return EditPayrollDialog(payrollEntry: entry);
+      },
+    );
+    if (result != null) {
+      print('👤 [HomePage] Edit dialog closed, refreshing dashboard...');
+      await _loadDashboardData();
+    }
+  }
+
+  void _deletePayrollFromDashboard(PayrollEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Payroll Entry'),
+          content: Text(
+              'Are you sure you want to delete payroll entry for ${entry.employeeName}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        await _dbService.deletePayrollEntry(entry.id);
+        await _loadDashboardData();
+        _showSnackBar('Payroll entry deleted successfully');
+      } catch (e) {
+        _showSnackBar('Failed to delete payroll entry: $e', isError: true);
+      }
+    }
+  }
+
+  void _uploadPayrollAttachmentFromDashboard(String payrollId) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final bytes = file.bytes;
+
+        if (bytes != null) {
+          if (bytes.length > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.', isError: true);
+            return;
+          }
+
+          await _uploadPDFToServer('payroll', payrollId, file.name, bytes);
+          _showSnackBar('Attachment uploaded successfully');
+          await _loadDashboardData();
+        }
+      }
+    } catch (e) {
+      _showSnackBar('Failed to upload attachment: $e', isError: true);
+    }
+  }
+
+  void _viewPayrollAttachmentsFromDashboard(String payrollId) async {
+    try {
+      final attachments = await _getPDFAttachments('payroll', payrollId);
+      _showAttachmentsDialog(attachments, payrollId, 'payroll');
+    } catch (e) {
+      _showSnackBar('Error loading attachments: $e', isError: true);
+    }
+  }
+
+  // Bank Statement methods reusing existing code pattern
+  void _editBankStatementFromDashboard(BankStatement statement) async {
+    print('🏦 [HomePage] Edit bank statement clicked for: ${statement.description}');
+    final result = await showDialog<BankStatement>(
+      context: context,
+      builder: (BuildContext context) {
+        return EditBankStatementDialog(bankStatement: statement);
+      },
+    );
+    if (result != null) {
+      print('🏦 [HomePage] Edit dialog closed, refreshing dashboard...');
+      await _loadDashboardData();
+    }
+  }
+
+  void _deleteBankStatementFromDashboard(BankStatement statement) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Bank Statement'),
+          content: Text(
+              'Are you sure you want to delete this bank statement: ${statement.description}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        await _dbService.deleteBankStatement(statement.id);
+        await _loadDashboardData();
+        _showSnackBar('Bank statement deleted successfully');
+      } catch (e) {
+        _showSnackBar('Failed to delete bank statement: $e', isError: true);
+      }
+    }
+  }
+
+  void _uploadBankStatementAttachmentFromDashboard(String bankStatementId) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final bytes = file.bytes;
+
+        if (bytes != null) {
+          if (bytes.length > 25 * 1024 * 1024) {
+            _showSnackBar('File too large. Maximum size is 25MB.', isError: true);
+            return;
+          }
+
+          await _uploadPDFToServer('bank_statement', bankStatementId, file.name, bytes);
+          _showSnackBar('Attachment uploaded successfully');
+          await _loadDashboardData();
+        }
+      }
+    } catch (e) {
+      _showSnackBar('Failed to upload attachment: $e', isError: true);
+    }
+  }
+
+  void _viewBankStatementAttachmentsFromDashboard(String bankStatementId) async {
+    try {
+      final attachments = await _getPDFAttachments('bank_statement', bankStatementId);
+      _showAttachmentsDialog(attachments, bankStatementId, 'bank_statement');
+    } catch (e) {
+      _showSnackBar('Error loading attachments: $e', isError: true);
+    }
+  }
+
+  // Enhanced attachments dialog with delete functionality
+  void _showAttachmentsDialog(List<dynamic> attachments, String entityId, String entityType) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('${entityType.toUpperCase()} Attachments'),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: attachments.isEmpty
+                ? const Center(child: Text('No attachments found'))
+                : ListView.builder(
+                    itemCount: attachments.length,
+                    itemBuilder: (context, index) {
+                      final attachment = attachments[index];
+                      final rawFilename = attachment['original_filename'] ??
+                          attachment['filename'] ??
+                          'Unknown';
+
+                      final filename = _decodeFilename(rawFilename);
+
+                      return ListTile(
+                        leading: const Icon(Icons.attach_file),
+                        title: Text(filename),
+                        subtitle: Text(
+                            'Uploaded: ${attachment['created_at']?.substring(0, 10) ?? 'Unknown'}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.download),
+                              onPressed: () => _downloadPDF(attachment['id']),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _deleteAttachmentFromDashboard(
+                                  attachment['id'].toString(), filename),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteAttachmentFromDashboard(String attachmentId, String filename) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Attachment'),
+          content: Text(
+              'Are you sure you want to delete "$filename"?\n\nThis action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        await _dbService.deleteAttachment(attachmentId);
+        _showSnackBar('Attachment deleted successfully');
+        
+        // Close the attachments dialog and refresh dashboard
+        if (mounted) {
+          Navigator.of(context).pop();
+          await _loadDashboardData();
+        }
+      } catch (e) {
+        _showSnackBar('Failed to delete attachment: $e', isError: true);
+      }
     }
   }
 }
