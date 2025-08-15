@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/simple_company_context.dart';
+import '../widgets/copyright_footer.dart';
 
 class SimpleCompanySelectionPage extends StatefulWidget {
   final VoidCallback onCompanySelected;
@@ -91,6 +92,9 @@ class _SimpleCompanySelectionPageState
             ),
 
             const Spacer(),
+
+            // Copyright footer
+            const CopyrightFooter(),
 
             if (_isLoading)
               const Center(

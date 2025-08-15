@@ -783,6 +783,16 @@ class DatabaseService {
       throw Exception('No company context set. Please select a company first.');
     }
 
+    debugPrint('💰 === FETCHING PAYROLL ENTRIES ===');
+    debugPrint('💰 Company ID: $_currentCompanyId');
+    debugPrint('💰 Demo Mode: $_isDemoMode');
+
+    // Handle demo mode separately with dedicated demo data
+    if (_isDemoMode) {
+      debugPrint('💰 Using demo data (no database query)');
+      return _getMockPayrollEntries();
+    }
+
     try {
       final response = await http
           .get(
@@ -1146,6 +1156,16 @@ class DatabaseService {
   Future<List<BankStatement>> getBankStatements() async {
     if (!hasCompanyContext) {
       throw Exception('No company context set. Please select a company first.');
+    }
+
+    debugPrint('🏦 === FETCHING BANK STATEMENTS ===');
+    debugPrint('🏦 Company ID: $_currentCompanyId');
+    debugPrint('🏦 Demo Mode: $_isDemoMode');
+
+    // Handle demo mode separately with dedicated demo data
+    if (_isDemoMode) {
+      debugPrint('🏦 Using demo data (no database query)');
+      return _getMockBankStatements();
     }
 
     try {
@@ -1745,6 +1765,12 @@ class DatabaseService {
     debugPrint('📊 Company ID: $_currentCompanyId');
     debugPrint('📊 Demo Mode: $_isDemoMode');
 
+    // Handle demo mode separately with calculated metrics from demo data
+    if (_isDemoMode) {
+      debugPrint('📊 Using calculated demo metrics (no database query)');
+      return _calculateMockMetrics();
+    }
+
     try {
       final url = '$_baseUrl/dashboard/$_currentCompanyId';
       debugPrint('📊 API URL: $url');
@@ -1868,35 +1894,82 @@ class DatabaseService {
       Invoice(
         id: '1',
         invoiceNumber: 'DEMO-001',
-        clientName: 'Sample Client A',
-        amount: 2500.00,
-        date: DateTime.parse('2024-08-01'),
-        dueDate: DateTime.parse('2024-08-15'),
-        status: 'Paid',
-        description: 'Demo invoice for services',
-        createdAt: DateTime.now(),
+        clientName: 'TechCorp Solutions',
+        amount: 3000.00, // Gross amount
+        date: DateTime.parse('2025-01-15'),
+        dueDate: DateTime.parse('2025-02-15'),
+        status: 'paid',
+        description: 'Web Development Services - Q1 2025',
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+        // VAT breakdown
+        netAmount: 2500.00,
+        vatAmount: 500.00,
+        grossAmount: 3000.00,
+        vatRateId: 1,
       ),
       Invoice(
         id: '2',
         invoiceNumber: 'DEMO-002',
-        clientName: 'Sample Client B',
-        amount: 1800.00,
-        date: DateTime.parse('2024-08-05'),
-        dueDate: DateTime.parse('2024-08-20'),
-        status: 'Pending',
-        description: 'Demo consulting work',
-        createdAt: DateTime.now(),
+        clientName: 'Creative Media Ltd',
+        amount: 2160.00, // Gross amount
+        date: DateTime.parse('2025-01-20'),
+        dueDate: DateTime.parse('2025-02-20'),
+        status: 'pending',
+        description: 'Digital Marketing Campaign',
+        createdAt: DateTime.now().subtract(const Duration(days: 5)),
+        // VAT breakdown
+        netAmount: 1800.00,
+        vatAmount: 360.00,
+        grossAmount: 2160.00,
+        vatRateId: 1,
       ),
       Invoice(
         id: '3',
         invoiceNumber: 'DEMO-003',
-        clientName: 'Sample Client C',
-        amount: 3200.00,
-        date: DateTime.parse('2024-08-10'),
-        dueDate: DateTime.parse('2024-08-25'),
-        status: 'Overdue',
-        description: 'Demo project invoice',
-        createdAt: DateTime.now(),
+        clientName: 'Business Solutions Inc',
+        amount: 4800.00, // Gross amount
+        date: DateTime.parse('2025-01-10'),
+        dueDate: DateTime.parse('2025-01-25'),
+        status: 'overdue',
+        description: 'Software Consultation & Implementation',
+        createdAt: DateTime.now().subtract(const Duration(days: 15)),
+        // VAT breakdown
+        netAmount: 4000.00,
+        vatAmount: 800.00,
+        grossAmount: 4800.00,
+        vatRateId: 1,
+      ),
+      Invoice(
+        id: '4',
+        invoiceNumber: 'DEMO-004',
+        clientName: 'StartupHub',
+        amount: 1440.00, // Gross amount
+        date: DateTime.parse('2025-01-25'),
+        dueDate: DateTime.parse('2025-02-25'),
+        status: 'draft',
+        description: 'Mobile App UI/UX Design',
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        // VAT breakdown
+        netAmount: 1200.00,
+        vatAmount: 240.00,
+        grossAmount: 1440.00,
+        vatRateId: 1,
+      ),
+      Invoice(
+        id: '5',
+        invoiceNumber: 'DEMO-005',
+        clientName: 'Global Enterprises',
+        amount: 6000.00, // Gross amount
+        date: DateTime.parse('2025-01-30'),
+        dueDate: DateTime.parse('2025-03-01'),
+        status: 'sent',
+        description: 'Enterprise System Integration',
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        // VAT breakdown
+        netAmount: 5000.00,
+        vatAmount: 1000.00,
+        grossAmount: 6000.00,
+        vatRateId: 1,
       ),
     ];
   }
@@ -1905,30 +1978,99 @@ class DatabaseService {
     return [
       Expense(
         id: '1',
-        date: DateTime.parse('2024-07-20'),
-        description: 'Demo Office Supplies',
-        category: 'Office',
-        amount: 250.00,
-        status: 'Approved',
-        notes: 'Sample office expenses',
+        date: DateTime.parse('2025-01-20'),
+        description: 'Office Supplies & Stationery',
+        category: 'Office Supplies',
+        amount: 300.00, // Gross amount
+        status: 'recorded',
+        notes: 'Printer paper, pens, notebooks for Q1',
+        // VAT breakdown
+        netAmount: 250.00,
+        vatAmount: 50.00,
+        grossAmount: 300.00,
+        vatRate: 20.0,
+        vatRateId: 1,
+        createdAt: DateTime.now().subtract(const Duration(days: 8)),
       ),
       Expense(
         id: '2',
-        date: DateTime.parse('2024-07-18'),
-        description: 'Demo Software License',
-        category: 'Technology',
-        amount: 800.00,
-        status: 'Pending',
-        notes: 'Sample software cost',
+        date: DateTime.parse('2025-01-18'),
+        description: 'Adobe Creative Suite License',
+        category: 'Software & Technology',
+        amount: 960.00, // Gross amount
+        status: 'recorded',
+        notes: 'Annual subscription for design team',
+        // VAT breakdown
+        netAmount: 800.00,
+        vatAmount: 160.00,
+        grossAmount: 960.00,
+        vatRate: 20.0,
+        vatRateId: 1,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
       ),
       Expense(
         id: '3',
-        date: DateTime.parse('2024-07-15'),
-        description: 'Demo Client Lunch',
-        category: 'Meals',
-        amount: 120.00,
-        status: 'Approved',
-        notes: 'Sample meal expense',
+        date: DateTime.parse('2025-01-15'),
+        description: 'Client Meeting Lunch',
+        category: 'Business Meals',
+        amount: 144.00, // Gross amount
+        status: 'recorded',
+        notes: 'Lunch with TechCorp Solutions team',
+        // VAT breakdown
+        netAmount: 120.00,
+        vatAmount: 24.00,
+        grossAmount: 144.00,
+        vatRate: 20.0,
+        vatRateId: 1,
+        createdAt: DateTime.now().subtract(const Duration(days: 13)),
+      ),
+      Expense(
+        id: '4',
+        date: DateTime.parse('2025-01-25'),
+        description: 'Business Travel - London Conference',
+        category: 'Travel & Transport',
+        amount: 480.00, // Gross amount
+        status: 'pending',
+        notes: 'Train tickets and accommodation',
+        // VAT breakdown
+        netAmount: 400.00,
+        vatAmount: 80.00,
+        grossAmount: 480.00,
+        vatRate: 20.0,
+        vatRateId: 1,
+        createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      ),
+      Expense(
+        id: '5',
+        date: DateTime.parse('2025-01-30'),
+        description: 'Marketing Materials & Printing',
+        category: 'Marketing & Advertising',
+        amount: 240.00, // Gross amount
+        status: 'recorded',
+        notes: 'Business cards and brochures',
+        // VAT breakdown
+        netAmount: 200.00,
+        vatAmount: 40.00,
+        grossAmount: 240.00,
+        vatRate: 20.0,
+        vatRateId: 1,
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      Expense(
+        id: '6',
+        date: DateTime.parse('2025-01-12'),
+        description: 'Internet & Phone Services',
+        category: 'Utilities & Communications',
+        amount: 180.00, // Gross amount
+        status: 'recorded',
+        notes: 'Monthly broadband and phone package',
+        // VAT breakdown
+        netAmount: 150.00,
+        vatAmount: 30.00,
+        grossAmount: 180.00,
+        vatRate: 20.0,
+        vatRateId: 1,
+        createdAt: DateTime.now().subtract(const Duration(days: 16)),
       ),
     ];
   }
@@ -1937,56 +2079,216 @@ class DatabaseService {
     return [
       PayrollEntry(
         id: '1',
-        period: 'July 2024',
-        employeeName: 'John Demo',
-        grossPay: 5000.00,
-        deductions: 1200.00,
-        netPay: 3800.00,
+        period: 'January 2025',
+        employeeName: 'Alexandra Thompson',
+        grossPay: 5500.00,
+        deductions: 1485.00, // Tax, NI, Pension
+        netPay: 4015.00,
+        payDate: DateTime.parse('2025-01-31'),
+        employeeId: 'EMP001',
       ),
       PayrollEntry(
         id: '2',
-        period: 'July 2024',
-        employeeName: 'Sarah Demo',
-        grossPay: 4500.00,
-        deductions: 1100.00,
-        netPay: 3400.00,
+        period: 'January 2025',
+        employeeName: 'Michael Rodriguez',
+        grossPay: 4800.00,
+        deductions: 1296.00, // Tax, NI, Pension
+        netPay: 3504.00,
+        payDate: DateTime.parse('2025-01-31'),
+        employeeId: 'EMP002',
       ),
       PayrollEntry(
         id: '3',
-        period: 'July 2024',
-        employeeName: 'Mike Demo',
+        period: 'January 2025',
+        employeeName: 'Sarah Chen',
         grossPay: 4200.00,
-        deductions: 1000.00,
-        netPay: 3200.00,
+        deductions: 1134.00, // Tax, NI, Pension
+        netPay: 3066.00,
+        payDate: DateTime.parse('2025-01-31'),
+        employeeId: 'EMP003',
+      ),
+      PayrollEntry(
+        id: '4',
+        period: 'January 2025',
+        employeeName: 'David Wilson',
+        grossPay: 6200.00,
+        deductions: 1674.00, // Tax, NI, Pension
+        netPay: 4526.00,
+        payDate: DateTime.parse('2025-01-31'),
+        employeeId: 'EMP004',
+      ),
+      PayrollEntry(
+        id: '5',
+        period: 'December 2024',
+        employeeName: 'Alexandra Thompson',
+        grossPay: 5500.00,
+        deductions: 1485.00,
+        netPay: 4015.00,
+        payDate: DateTime.parse('2024-12-31'),
+        employeeId: 'EMP001',
+      ),
+      PayrollEntry(
+        id: '6',
+        period: 'December 2024',
+        employeeName: 'Michael Rodriguez',
+        grossPay: 4800.00,
+        deductions: 1296.00,
+        netPay: 3504.00,
+        payDate: DateTime.parse('2024-12-31'),
+        employeeId: 'EMP002',
+      ),
+      PayrollEntry(
+        id: '7',
+        period: 'December 2024',
+        employeeName: 'Sarah Chen',
+        grossPay: 4200.00,
+        deductions: 1134.00,
+        netPay: 3066.00,
+        payDate: DateTime.parse('2024-12-31'),
+        employeeId: 'EMP003',
+      ),
+      PayrollEntry(
+        id: '8',
+        period: 'December 2024',
+        employeeName: 'David Wilson',
+        grossPay: 6200.00,
+        deductions: 1674.00,
+        netPay: 4526.00,
+        payDate: DateTime.parse('2024-12-31'),
+        employeeId: 'EMP004',
       ),
     ];
   }
 
   List<BankStatement> _getMockBankStatements() {
     return [
+      // Recent transactions (January 2025)
       BankStatement(
         id: '1',
-        transactionDate: DateTime.parse('2024-07-25'),
-        description: 'Demo Client Payment - INV-001',
-        transactionType: 'Credit',
-        amount: 2500.00,
-        balance: 15680.00,
+        transactionDate: DateTime.parse('2025-01-31'),
+        description: 'Payroll Transfer - January 2025',
+        transactionType: 'Debit',
+        amount: -20700.00,
+        balance: 47850.00,
+        reference: 'PAY-JAN-2025',
       ),
       BankStatement(
         id: '2',
-        transactionDate: DateTime.parse('2024-07-24'),
-        description: 'Demo Office Rent',
-        transactionType: 'Debit',
-        amount: -1200.00,
-        balance: 13180.00,
+        transactionDate: DateTime.parse('2025-01-30'),
+        description: 'TechCorp Solutions - DEMO-001',
+        transactionType: 'Credit',
+        amount: 3000.00,
+        balance: 68550.00,
+        reference: 'INV-DEMO-001',
       ),
       BankStatement(
         id: '3',
-        transactionDate: DateTime.parse('2024-07-23'),
-        description: 'Demo Software Subscription',
+        transactionDate: DateTime.parse('2025-01-29'),
+        description: 'Marketing Materials Payment',
         transactionType: 'Debit',
-        amount: -99.00,
-        balance: 14380.00,
+        amount: -240.00,
+        balance: 65550.00,
+        reference: 'EXP-MKT-001',
+      ),
+      BankStatement(
+        id: '4',
+        transactionDate: DateTime.parse('2025-01-28'),
+        description: 'Creative Media Ltd - DEMO-002',
+        transactionType: 'Credit',
+        amount: 2160.00,
+        balance: 65790.00,
+        reference: 'INV-DEMO-002',
+      ),
+      BankStatement(
+        id: '5',
+        transactionDate: DateTime.parse('2025-01-25'),
+        description: 'Travel Expenses - London Conference',
+        transactionType: 'Debit',
+        amount: -480.00,
+        balance: 63630.00,
+        reference: 'EXP-TRV-001',
+      ),
+      BankStatement(
+        id: '6',
+        transactionDate: DateTime.parse('2025-01-22'),
+        description: 'Office Supplies Purchase',
+        transactionType: 'Debit',
+        amount: -300.00,
+        balance: 64110.00,
+        reference: 'EXP-OFF-001',
+      ),
+      BankStatement(
+        id: '7',
+        transactionDate: DateTime.parse('2025-01-20'),
+        description: 'Adobe Creative Suite License',
+        transactionType: 'Debit',
+        amount: -960.00,
+        balance: 64410.00,
+        reference: 'EXP-SW-001',
+      ),
+      BankStatement(
+        id: '8',
+        transactionDate: DateTime.parse('2025-01-18'),
+        description: 'Global Enterprises - DEMO-005',
+        transactionType: 'Credit',
+        amount: 6000.00,
+        balance: 65370.00,
+        reference: 'INV-DEMO-005',
+      ),
+      BankStatement(
+        id: '9',
+        transactionDate: DateTime.parse('2025-01-15'),
+        description: 'Business Lunch - Client Meeting',
+        transactionType: 'Debit',
+        amount: -144.00,
+        balance: 59370.00,
+        reference: 'EXP-MEAL-001',
+      ),
+      BankStatement(
+        id: '10',
+        transactionDate: DateTime.parse('2025-01-12'),
+        description: 'Internet & Phone Services',
+        transactionType: 'Debit',
+        amount: -180.00,
+        balance: 59514.00,
+        reference: 'EXP-UTL-001',
+      ),
+      // Previous month (December 2024)
+      BankStatement(
+        id: '11',
+        transactionDate: DateTime.parse('2024-12-31'),
+        description: 'Payroll Transfer - December 2024',
+        transactionType: 'Debit',
+        amount: -20700.00,
+        balance: 59694.00,
+        reference: 'PAY-DEC-2024',
+      ),
+      BankStatement(
+        id: '12',
+        transactionDate: DateTime.parse('2024-12-28'),
+        description: 'Year-end Client Payment',
+        transactionType: 'Credit',
+        amount: 5400.00,
+        balance: 80394.00,
+        reference: 'INV-YE-001',
+      ),
+      BankStatement(
+        id: '13',
+        transactionDate: DateTime.parse('2024-12-15'),
+        description: 'Office Rent - December',
+        transactionType: 'Debit',
+        amount: -2400.00,
+        balance: 74994.00,
+        reference: 'RENT-DEC-2024',
+      ),
+      BankStatement(
+        id: '14',
+        transactionDate: DateTime.parse('2024-12-10'),
+        description: 'Business Insurance Premium',
+        transactionType: 'Debit',
+        amount: -1200.00,
+        balance: 77394.00,
+        reference: 'INS-ANNUAL',
       ),
     ];
   }
@@ -2025,9 +2327,10 @@ class DatabaseService {
 
   List<String> _getMockEmployees() {
     return [
-      'John Demo',
-      'Sarah Demo',
-      'Mike Demo',
+      'Alexandra Thompson',
+      'Michael Rodriguez',
+      'Sarah Chen',
+      'David Wilson',
     ];
   }
 

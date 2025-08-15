@@ -10,6 +10,7 @@ import '../context/simple_company_context.dart';
 import '../dialogs/add_expense_dialog.dart';
 import '../dialogs/edit_expense_dialog.dart';
 import '../utils/currency_utils.dart';
+import '../widgets/copyright_footer.dart';
 
 class ExpensesPage extends StatefulWidget {
   const ExpensesPage({super.key});
@@ -690,12 +691,19 @@ class _ExpensesPageState extends State<ExpensesPage> {
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                         )
-                      : ListView.builder(
-                          itemCount: _filteredExpenses.length,
-                          itemBuilder: (context, index) {
-                            final expense = _filteredExpenses[index];
-                            return _buildExpenseCard(expense);
-                          },
+                      : Column(
+                          children: [
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: _filteredExpenses.length,
+                                itemBuilder: (context, index) {
+                                  final expense = _filteredExpenses[index];
+                                  return _buildExpenseCard(expense);
+                                },
+                              ),
+                            ),
+                            const CopyrightFooter(showBackground: true),
+                          ],
                         ),
             ),
           ),

@@ -11,6 +11,7 @@ import '../context/simple_company_context.dart';
 import '../dialogs/add_invoice_dialog.dart';
 import '../dialogs/edit_invoice_dialog.dart';
 import '../utils/currency_utils.dart';
+import '../widgets/copyright_footer.dart';
 
 class InvoicesPage extends StatefulWidget {
   const InvoicesPage({super.key});
@@ -683,7 +684,12 @@ class _InvoicesPageState extends State<InvoicesPage> {
         Expanded(
           child: _filteredInvoices.isEmpty
               ? _buildEmptyState()
-              : _buildInvoicesList(),
+              : Column(
+                  children: [
+                    Expanded(child: _buildInvoicesList()),
+                    const CopyrightFooter(showBackground: true),
+                  ],
+                ),
         ),
       ],
     );

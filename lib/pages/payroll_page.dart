@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../utils/currency_utils.dart';
 import '../services/api_config.dart';
+import '../widgets/copyright_footer.dart';
 
 class PayrollPage extends StatefulWidget {
   const PayrollPage({super.key});

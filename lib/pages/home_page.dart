@@ -1,4 +1,5 @@
-import 'dart:html' as html; // Only used for Web
+import 'dart:html' as html;
+import '../widgets/copyright_footer.dart'; // Only used for Web
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -1081,6 +1082,12 @@ class _HomePageState extends State<HomePage> {
 
               // Tab content
               _buildTabContent(),
+
+              // Copyright footer
+              const CopyrightFooter(
+                padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                showBackground: true,
+              ),
 
               // Bottom padding for mobile navigation
               SizedBox(height: constraints.maxWidth < 600 ? 80 : 24),
