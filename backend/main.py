@@ -1466,7 +1466,6 @@ async def create_invoice(invoice_data: dict, company_id: str = Query(..., descri
             invoice_data.get('description'),
             # VAT fields
             invoice_data.get('vat_rate_id'),
-            float(invoice_data.get('net_amount', 0)) if invoice_data.get('net_amount') else None,
             net_amount if net_amount > 0 else None,
             vat_amount if vat_amount > 0 else None,
             gross_amount if gross_amount > 0 else None

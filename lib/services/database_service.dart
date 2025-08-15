@@ -419,19 +419,25 @@ class DatabaseService {
       throw Exception('No company context set. Please select a company first.');
     }
 
-    if (_isDemoMode) {
-      throw Exception(
-          'Cannot create invoices in demo mode. Please create a real company.');
-    }
-
     debugPrint('📄 === CREATING INVOICE ===');
     debugPrint('📄 Company ID: $_currentCompanyId');
+    debugPrint('📄 Demo Mode: $_isDemoMode');
     debugPrint('📄 Invoice Number: ${invoice.invoiceNumber}');
     debugPrint('📄 Client: ${invoice.clientName}');
     debugPrint('📄 Amount: \${invoice.amount}');
 
+    // Handle demo mode separately - simulate successful creation
+    if (_isDemoMode) {
+      debugPrint('📄 Demo mode: Simulating invoice creation (no database query)');
+      // Add a small delay to simulate API call
+      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('📄 Demo invoice creation simulated successfully');
+      return;
+    }
+
     try {
-      final requestBody = {
+      // Try with full VAT fields first
+      final requestBodyWithVAT = {
         'company_id': _currentCompanyId!, // Keep as string, API expects string
         'invoice_number': invoice.invoiceNumber,
         'client_name': invoice.clientName,
@@ -448,12 +454,25 @@ class DatabaseService {
         'gross_amount': invoice.grossAmount,
       };
 
+      // Fallback without VAT fields for older backend versions
+      final requestBodyBasic = {
+        'company_id': _currentCompanyId!,
+        'invoice_number': invoice.invoiceNumber,
+        'client_name': invoice.clientName,
+        'amount': invoice.amount,
+        'date': invoice.date?.toIso8601String(),
+        'due_date': invoice.dueDate.toIso8601String(),
+        'status': invoice.status,
+        'description': invoice.description,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      var requestBody = requestBodyWithVAT;
+
       debugPrint('📄 API URL: ${_buildUrl('invoices')}');
       debugPrint('📄 Request Body: ${jsonEncode(requestBody)}');
-      debugPrint(
-          '📄 Expected DB Query: INSERT INTO invoices (company_id, invoice_number, client_name, amount, due_date, status, description, created_at) VALUES (${_currentCompanyId}, \'${invoice.invoiceNumber}\', \'${invoice.clientName}\', ${invoice.amount}, \'${invoice.dueDate.toIso8601String()}\', \'${invoice.status}\', \'${invoice.description}\', NOW())');
 
-      final response = await http
+      var response = await http
           .post(
             Uri.parse(_buildUrl('invoices')),
             headers: _headers,
@@ -461,20 +480,57 @@ class DatabaseService {
           )
           .timeout(const Duration(seconds: 30));
 
+      // If VAT fields cause parameter mismatch, retry without them
+      if (response.statusCode == 500 && 
+          response.body.contains('not all arguments converted during string formatting')) {
+        debugPrint('📄 VAT fields caused parameter mismatch, retrying without VAT fields...');
+        requestBody = requestBodyBasic;
+        debugPrint('📄 Fallback Request Body: ${jsonEncode(requestBody)}');
+        
+        response = await http
+            .post(
+              Uri.parse(_buildUrl('invoices')),
+              headers: _headers,
+              body: jsonEncode(requestBody),
+            )
+            .timeout(const Duration(seconds: 30));
+      }
+
       debugPrint('📄 === DATABASE RESPONSE ===');
       debugPrint('📄 Status Code: ${response.statusCode}');
       debugPrint('📄 Response Body: ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        final error = jsonDecode(response.body);
         debugPrint('📄 === INSERT FAILED ===');
-        debugPrint('📄 Error: ${error['message'] ?? 'Unknown error'}');
-        throw Exception(error['message'] ?? 'Failed to insert invoice');
+        debugPrint('📄 Status Code: ${response.statusCode}');
+        debugPrint('📄 Raw Response: ${response.body}');
+        
+        try {
+          final error = jsonDecode(response.body);
+          debugPrint('📄 Parsed Error: ${error['detail'] ?? error['message'] ?? 'Unknown error'}');
+          
+          // Check for SQL parameter mismatch error (should be resolved by fallback now)
+          if (response.body.contains('not all arguments converted during string formatting')) {
+            throw Exception('Backend database error: SQL parameter mismatch persists even after fallback. Please contact support.');
+          }
+          
+          throw Exception(error['detail'] ?? error['message'] ?? 'Failed to insert invoice');
+        } catch (e) {
+          if (e.toString().contains('Backend database error')) {
+            rethrow; // Re-throw our custom error message
+          }
+          // If JSON parsing fails, use raw response
+          debugPrint('📄 Failed to parse error response as JSON: $e');
+          throw Exception('Server error: ${response.body}');
+        }
       }
 
       debugPrint('📄 === INVOICE CREATED ===');
-      debugPrint(
-          '📄 Invoice ${invoice.invoiceNumber} successfully saved to database');
+      if (requestBody == requestBodyBasic) {
+        debugPrint('📄 Invoice ${invoice.invoiceNumber} successfully saved to database (using fallback without VAT fields)');
+      } else {
+        debugPrint('📄 Invoice ${invoice.invoiceNumber} successfully saved to database (with VAT fields)');
+      }
     } catch (e) {
       debugPrint('📄 === INSERT ERROR ===');
       debugPrint('📄 Exception: $e');
@@ -628,9 +684,17 @@ class DatabaseService {
       throw Exception('No company context set. Please select a company first.');
     }
 
+    debugPrint('💸 === CREATING EXPENSE ===');
+    debugPrint('💸 Company ID: $_currentCompanyId');
+    debugPrint('💸 Demo Mode: $_isDemoMode');
+
+    // Handle demo mode separately - simulate successful creation
     if (_isDemoMode) {
-      throw Exception(
-          'Cannot create expenses in demo mode. Please sign up for a real account.');
+      debugPrint('💸 Demo mode: Simulating expense creation (no database query)');
+      // Add a small delay to simulate API call
+      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('💸 Demo expense creation simulated successfully');
+      return;
     }
 
     try {
@@ -823,12 +887,18 @@ class DatabaseService {
       throw Exception('No company context set. Please select a company first.');
     }
 
-    if (_isDemoMode) {
-      throw Exception(
-          'Cannot create payroll entries in demo mode. Please sign up for a real account.');
-    }
-
     debugPrint('💰 === INSERTING PAYROLL ENTRY ===');
+    debugPrint('💰 Company ID: $_currentCompanyId');
+    debugPrint('💰 Demo Mode: $_isDemoMode');
+
+    // Handle demo mode separately - simulate successful creation
+    if (_isDemoMode) {
+      debugPrint('💰 Demo mode: Simulating payroll entry creation (no database query)');
+      // Add a small delay to simulate API call
+      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('💰 Demo payroll entry creation simulated successfully');
+      return;
+    }
     debugPrint('💰 Employee: ${entry.employeeName}');
     debugPrint('💰 Period: ${entry.period}');
     debugPrint('💰 Gross Pay: \$${entry.grossPay}');
@@ -1194,8 +1264,21 @@ class DatabaseService {
   }
 
   Future<void> insertBankStatement(BankStatement statement) async {
-    if (!hasCompanyContext || _isDemoMode) {
-      throw Exception('Cannot create bank statements in demo mode');
+    if (!hasCompanyContext) {
+      throw Exception('No company context set. Please select a company first.');
+    }
+
+    debugPrint('🏦 === INSERTING BANK STATEMENT ===');
+    debugPrint('🏦 Company ID: $_currentCompanyId');
+    debugPrint('🏦 Demo Mode: $_isDemoMode');
+
+    // Handle demo mode separately - simulate successful creation
+    if (_isDemoMode) {
+      debugPrint('🏦 Demo mode: Simulating bank statement creation (no database query)');
+      // Add a small delay to simulate API call
+      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('🏦 Demo bank statement creation simulated successfully');
+      return;
     }
 
     try {
